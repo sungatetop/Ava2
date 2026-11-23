@@ -1,0 +1,4 @@
+# rustfmt 配置。
+edition = "2021"
+# 每个 import 单独一行，粒度到 item。
+imports_granularity = "Item"

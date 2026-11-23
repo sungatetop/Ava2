@@ -1,0 +1,15 @@
+{
+  "name": "@ava2-app/repoatlas",
+  "private": true,
+  "version": "0.2.0",
+  "description": "代码考古示例 App：读工作区目录 → 架构地图 + 影响面清单（工程场景）。",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  }
+}

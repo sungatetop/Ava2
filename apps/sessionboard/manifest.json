@@ -1,0 +1,12 @@
+{
+  "id": "sessionboard",
+  "name": "会话工作台",
+  "version": "0.1.4",
+  "description": "集中管理会话：查看、整理与恢复历史记录。",
+  "hostApi": 2,
+  "inject": ["slots", "events", "agent", "storage"],
+  "surfaces": ["surface.main", "surface.canvas", "nav.sidebar", "panel.sidebar", "panel.canvas"],
+  "contributes": {
+    "apps": [{ "id": "main", "entry": "app.js" }]
+  }
+}

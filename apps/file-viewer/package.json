@@ -1,0 +1,23 @@
+{
+  "name": "@ava2-app/file-viewer",
+  "private": true,
+  "version": "0.1.8",
+  "description": "ava2 画布文件预览 App：认领 surface.canvas，接收 canvas.openPath 后预览工作区文件",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ava-ai/app-sdk": "file:../../packages/app-sdk",
+    "jszip": "^3.10.1",
+    "mammoth": "^1.9.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  }
+}

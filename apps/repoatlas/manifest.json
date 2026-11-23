@@ -1,0 +1,13 @@
+{
+  "id": "repoatlas",
+  "name": "代码考古",
+  "version": "0.2.0",
+  "hostApi": 2,
+  "description": "选仓库 → 输入目标符号 → 真实扫描仓库文件内容统计引用，生成影响面清单与目录命中热度图。面向工程团队。",
+  "author": "Ava Team",
+  "license": "MIT",
+  "icon": "M12 2a10 10 0 0 1 10 10 10 10 0 0 1-10 10A10 10 0 0 1 2 12 10 10 0 0 1 12 2zm0 4a6 6 0 0 0-6 6 6 6 0 0 0 6 6 6 6 0 0 0 6-6 6 6 0 0 0-6-6zM12 8a4 4 0 0 1 4 4 4 4 0 0 1-4 4 4 4 0 0 1-4-4 4 4 0 0 1 4-4z",
+  "inject": ["slots", "agent", "events", "storage"],
+  "surfaces": ["surface.main", "surface.canvas", "nav.sidebar", "panel.sidebar", "panel.canvas"],
+  "entry": "main.js"
+}

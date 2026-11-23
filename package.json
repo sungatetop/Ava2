@@ -1,0 +1,35 @@
+{
+  "name": "ava2",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "scripts": {
+    "vendor": "node scripts/build-vendor.mjs",
+    "dev": "npm run vendor && vite --port 1420 --strictPort",
+    "build": "npm run vendor && tsc && vite build",
+    "preview": "vite preview",
+    "check:contracts": "node scripts/check-app-contract.mjs",
+    "build:sdk": "tsc -p packages/app-sdk/tsconfig.json",
+    "version:check": "node scripts/version.mjs --check",
+    "version:set": "node scripts/version.mjs --set",
+    "bundle": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publish.ps1",
+    "tauri": "tauri"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "esbuild": "^0.28.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16",
+    "@tauri-apps/cli": "^2"
+  }
+}

@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<title>ava2 · titlebar + tabbar 合并预览</title>
+<style>
+/* ── ava2 真实设计令牌（与 src/styles/tokens.css 完全一致） ── */
+:root {
+  --ava-bg-base: #ffffff;
+  --ava-bg-layer-1: #ffffff;
+  --ava-bg-layer-2: #ffffff;
+  --ava-bg-sidebar: #f9fafb;
+  --ava-label-primary: #0f1115;
+  --ava-label-secondary: #61666b;
+  --ava-label-tertiary: #81858c;
+  --ava-border-l1: rgba(0, 0, 0, 0.04);
+  --ava-border-l2: rgba(0, 0, 0, 0.10);
+  --ava-border-l3: rgba(0, 0, 0, 0.12);
+  --ava-interactive-bg-hover: rgba(38, 49, 72, 0.06);
+  --ava-nav-active: #ebeef2;
+  --ava-state-business-primary: #4176e6;
+  --ava-state-business-primary-hover: #5585ea;
+  --ava-state-danger: #ec1313;
+  --ava-state-success: #12a150;
+  --ava-brand: #0f1115;
+  --ava-shadow-panel: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --ava-space-0: 2px; --ava-space-1: 4px; --ava-space-2: 8px;
+  --ava-space-3: 10px; --ava-space-4: 16px; --ava-space-5: 24px;
+  --ava-radius-xs: 4px; --ava-radius-sm: 10px; --ava-radius-md: 12px;
+  --ava-radius-lg: 16px; --ava-radius-pill: 999px;
+  --ava-titlebar-h: 36px;
+  --ava-tabbar-h: 40px;
+  --ava-font-ui: "HarmonyOS Sans SC", "Microsoft YaHei", "Segoe UI", "Helvetica Neue", arial, sans-serif;
+  font-family: var(--ava-font-ui);
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--ava-label-primary);
+  background: var(--ava-bg-base);
+  -webkit-font-smoothing: antialiased;
+}
+:root[data-theme="dark"] {
+  --ava-bg-base: #151517;
+  --ava-bg-layer-1: #232324;
+  --ava-bg-layer-2: #2c2c2e;
+  --ava-bg-sidebar: #1b1b1c;
+  --ava-label-primary: #f9fafb;
+  --ava-label-secondary: #cfd3d6;
+  --ava-label-tertiary: #adb2b8;
+  --ava-border-l1: rgba(255, 255, 255, 0.06);
+  --ava-border-l2: rgba(255, 255, 255, 0.12);
+  --ava-border-l3: rgba(255, 255, 255, 0.16);
+  --ava-interactive-bg-hover: rgba(255, 255, 255, 0.08);
+  --ava-nav-active: #43454a;
+  --ava-state-business-primary: #679efe;
+  --ava-state-business-primary-hover: #5b8ef0;
+  --ava-state-danger: #f25a5a;
+  --ava-state-success: #3ecf8e;
+  --ava-brand: #f9fafb;
+  --ava-shadow-panel: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+
+/* ── 壳骨架 ── */
+.app-root { display: flex; flex-direction: column; height: 100%; background: var(--ava-bg-base); }
+
+/* 现状：两行 */
+.titlebar {
+  display: flex; align-items: center; gap: var(--ava-space-3);
+  height: var(--ava-titlebar-h); padding: 0 var(--ava-space-3);
+  border-bottom: 0.5px solid var(--ava-border-l2); flex: none;
+}
+.tabbar {
+  display: flex; align-items: center; gap: var(--ava-space-0);
+  height: var(--ava-tabbar-h); padding: 0 var(--ava-space-2);
+  border-bottom: 0.5px solid var(--ava-border-l2); flex: none;
+}
+
+/* 合并后：单行 appbar（高度取 tabbar 档 40px，容纳 28px tab） */
+.appbar {
+  display: flex; align-items: center; gap: var(--ava-space-2);
+  height: var(--ava-tabbar-h); padding: 0 var(--ava-space-3);
+  border-bottom: 0.5px solid var(--ava-border-l2); flex: none;
+}
+.appbar-id { display: flex; align-items: center; gap: var(--ava-space-3); flex: none; }
+.appbar-sep {
+  width: 0.5px; height: 16px; flex: none;
+  background: var(--ava-border-l3); margin: 0 var(--ava-space-1);
+}
+.appbar-tabs {
+  display: flex; align-items: center; gap: var(--ava-space-0);
+  flex: 1; min-width: 0; overflow: hidden;
+}
+
+.titlebar-badge {
+  display: grid; place-items: center; width: 18px; height: 18px;
+  border-radius: var(--ava-radius-xs); background: var(--ava-brand);
+  color: var(--ava-bg-base); font-size: 11px; font-weight: 700;
+}
+.titlebar-name { font-size: 13px; font-weight: 600; letter-spacing: 0.2px; }
+.titlebar-dim { font-size: 12px; line-height: 18px; color: var(--ava-label-tertiary); white-space: nowrap; }
+.titlebar-spacer { flex: 1; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ava-label-tertiary); flex: none; }
+.status-dot.ok { background: var(--ava-state-success); }
+
+.icon-btn {
+  display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
+  border: none; border-radius: var(--ava-radius-xs); background: transparent;
+  color: var(--ava-label-secondary); cursor: pointer; flex: none;
+  transition: background 0.15s, color 0.15s;
+}
+.icon-btn:hover { background: var(--ava-interactive-bg-hover); color: var(--ava-label-primary); }
+.icon-btn.on { background: var(--ava-nav-active); color: var(--ava-label-primary); }
+
+.tab {
+  position: relative; display: flex; align-items: center; gap: var(--ava-space-2);
+  height: 28px; padding: 0 var(--ava-space-2) 0 var(--ava-space-3);
+  border-radius: var(--ava-radius-sm); color: var(--ava-label-secondary);
+  font-size: 13px; cursor: pointer; user-select: none; flex: none;
+  transition: background 0.15s, color 0.15s;
+}
+.tab:hover { background: var(--ava-interactive-bg-hover); }
+.tab.on { background: var(--ava-nav-active); color: var(--ava-label-primary); font-weight: 500; }
+.tab.on::after {
+  content: ""; position: absolute; left: 50%; bottom: 2px;
+  width: 16px; height: 2px; border-radius: 999px;
+  transform: translateX(-50%); background: var(--ava-state-business-primary);
+}
+.tab-close {
+  display: grid; place-items: center; width: 16px; height: 16px; padding: 0;
+  border: none; border-radius: var(--ava-radius-xs); background: transparent;
+  color: var(--ava-label-tertiary); font-size: 13px; line-height: 1; cursor: pointer;
+  opacity: 0; transition: opacity 0.12s, background 0.15s, color 0.15s;
+}
+.tab:hover .tab-close, .tab.on .tab-close { opacity: 1; }
+.tab-close:hover { background: var(--ava-interactive-bg-hover); color: var(--ava-label-primary); }
+.tab-float {
+  display: grid; place-items: center; width: 16px; height: 16px; padding: 0;
+  border: none; border-radius: var(--ava-radius-xs); background: transparent;
+  color: var(--ava-label-tertiary); cursor: pointer;
+  opacity: 0; transition: opacity 0.12s, background 0.15s, color 0.15s;
+}
+.tab:hover .tab-float, .tab.on .tab-float { opacity: 1; }
+.tab-float:hover { background: var(--ava-interactive-bg-hover); color: var(--ava-label-primary); }
+
+.shell { display: grid; grid-template-columns: 280px minmax(0, 1fr); flex: 1; min-height: 0; }
+.sidebar {
+  display: flex; flex-direction: column; gap: var(--ava-space-1);
+  padding: var(--ava-space-2) var(--ava-space-3); min-height: 0; overflow: hidden;
+  background: var(--ava-bg-sidebar); border-right: 0.5px solid var(--ava-border-l3);
+}
+.nav-link {
+  display: flex; align-items: center; gap: var(--ava-space-3);
+  height: 32px; padding: 0 var(--ava-space-3);
+  border-radius: var(--ava-radius-md); color: var(--ava-label-secondary);
+  font-size: 13px; cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.nav-link:hover { background: var(--ava-interactive-bg-hover); color: var(--ava-label-primary); }
+.nav-link.on { background: var(--ava-nav-active); color: var(--ava-label-primary); font-weight: 500; }
+.nav-ico { display: grid; place-items: center; width: 18px; height: 18px; flex: none; }
+.sb-group { margin-top: var(--ava-space-3); padding: 0 var(--ava-space-3); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; color: var(--ava-label-tertiary); }
+.sb-item { display: flex; align-items: center; gap: var(--ava-space-2); height: 28px; padding: 0 var(--ava-space-3); border-radius: var(--ava-radius-sm); font-size: 13px; color: var(--ava-label-secondary); }
+.sb-item:hover { background: var(--ava-interactive-bg-hover); }
+.sb-item .dim { margin-left: auto; font-size: 11px; color: var(--ava-label-tertiary); }
+.user-bar {
+  margin-top: auto; display: flex; align-items: center; gap: var(--ava-space-2);
+  height: 44px; padding: 0 var(--ava-space-2); border-radius: var(--ava-radius-md);
+}
+.user-bar:hover { background: var(--ava-interactive-bg-hover); }
+.user-bar-avatar { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--ava-state-business-primary); color: #fff; font-size: 12px; font-weight: 600; flex: none; }
+.user-bar-text { display: flex; flex-direction: column; line-height: 1.25; }
+.user-bar-name { font-size: 12px; font-weight: 500; }
+.user-bar-sub { font-size: 11px; color: var(--ava-label-tertiary); }
+
+.main-area { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.stage { flex: 1; min-height: 0; overflow: auto; }
+.pane { padding: var(--ava-space-4); }
+.msg { max-width: 640px; font-size: 13px; line-height: 22px; color: var(--ava-label-primary); }
+.msg-bubble {
+  align-self: flex-end; max-width: 460px; padding: var(--ava-space-2) var(--ava-space-3);
+  border-radius: var(--ava-radius-md); background: var(--ava-bg-sidebar);
+  font-size: 13px; line-height: 20px;
+}
+.msg-user { display: flex; justify-content: flex-end; margin: var(--ava-space-4) 0; }
+.composer {
+  margin: 0 var(--ava-space-4) var(--ava-space-4); padding: var(--ava-space-3);
+  border: 0.5px solid var(--ava-border-l2); border-radius: var(--ava-radius-lg);
+  background: var(--ava-bg-layer-1); box-shadow: var(--ava-shadow-panel);
+  font-size: 13px; color: var(--ava-label-tertiary);
+}
+
+/* ── 预览控制条（不属于产品 UI） ── */
+.ctl {
+  position: fixed; right: 20px; bottom: 20px; z-index: 99;
+  display: flex; align-items: center; gap: var(--ava-space-1);
+  padding: var(--ava-space-1); border-radius: var(--ava-radius-pill);
+  background: var(--ava-bg-layer-2); border: 0.5px solid var(--ava-border-l2);
+  box-shadow: var(--ava-shadow-panel);
+}
+.ctl button {
+  height: 30px; padding: 0 var(--ava-space-3); border: none;
+  border-radius: var(--ava-radius-pill); background: transparent;
+  color: var(--ava-label-secondary); font: inherit; font-size: 12px; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.ctl button:hover { background: var(--ava-interactive-bg-hover); color: var(--ava-label-primary); }
+.ctl button.on { background: var(--ava-state-business-primary); color: #fff; }
+.ctl-sep { width: 0.5px; height: 18px; background: var(--ava-border-l2); margin: 0 var(--ava-space-1); }
+.ctl-note {
+  position: fixed; left: 20px; bottom: 20px; z-index: 99; max-width: 420px;
+  padding: var(--ava-space-2) var(--ava-space-3); border-radius: var(--ava-radius-md);
+  background: var(--ava-bg-layer-2); border: 0.5px solid var(--ava-border-l2);
+  box-shadow: var(--ava-shadow-elevated); font-size: 12px; line-height: 18px;
+  color: var(--ava-label-secondary);
+}
+.ctl-note b { color: var(--ava-label-primary); font-weight: 600; }
+
+/* 状态切换 */
+[data-mode="before"] .appbar { display: none; }
+[data-mode="after"] .titlebar, [data-mode="after"] .tabbar { display: none; }
+[data-mode="after"] .main-area { padding-top: 0; }
+</style>
+</head>
+<body data-mode="after">
+<div class="app-root">
+
+  <!-- ═══ 现状：titlebar（36px）+ tabbar（40px）两行 ═══ -->
+  <header class="titlebar">
+    <button class="icon-btn" title="折叠侧边栏">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z M9 3v18"></path></svg>
+    </button>
+    <span class="titlebar-badge">A</span>
+    <span class="titlebar-name">Ava</span>
+    <span class="status-dot ok"></span>
+    <span class="titlebar-dim">http://127.0.0.1:9800｜App 13</span>
+    <span class="titlebar-spacer"></span>
+  </header>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="nav-link on"><span class="nav-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>对话</div>
+      <div class="nav-link"><span class="nav-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>会话工作台</div>
+      <div class="nav-link"><span class="nav-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M2 12h20"/></svg></span>模型管理</div>
+      <div class="sb-group">最近会话</div>
+      <div class="sb-item"><span>查看当前目录文件</span><span class="dim">14 小时前</span></div>
+      <div class="sb-item"><span>新会话 137203</span><span class="dim">15 小时前</span></div>
+      <div class="user-bar">
+        <span class="user-bar-avatar">本</span>
+        <span class="user-bar-text"><span class="user-bar-name">本地用户</span><span class="user-bar-sub">Ava · 本地模式</span></span>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <div class="tabbar">
+        <div class="tab on">
+          <span class="tab-title">对话</span>
+          <button class="tab-float" title="悬浮打开">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4 M13 12h8a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z"></path></svg>
+          </button>
+          <button class="tab-close" title="关闭">×</button>
+        </div>
+        <div class="tab"><span class="tab-title">会话工作台</span><button class="tab-close" title="关闭">×</button></div>
+        <span class="titlebar-spacer"></span>
+        <button class="icon-btn" title="展开画布">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z M15 3v18"></path></svg>
+        </button>
+      </div>
+      <div class="stage"><div class="pane" id="stage-a"></div></div>
+    </main>
+  </div>
+
+  <!-- ═══ 合并后：单行 appbar（40px）═══ -->
+  <header class="appbar">
+    <div class="appbar-id">
+      <button class="icon-btn" title="折叠侧边栏">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z M9 3v18"></path></svg>
+      </button>
+      <span class="titlebar-badge">A</span>
+      <span class="titlebar-name">Ava</span>
+      <span class="status-dot ok"></span>
+      <span class="titlebar-dim">127.0.0.1:9800 · App 13</span>
+    </div>
+    <span class="appbar-sep"></span>
+    <div class="appbar-tabs" role="tablist" aria-label="打开的视图">
+      <div class="tab on">
+        <span class="tab-title">对话</span>
+        <button class="tab-float" title="悬浮打开">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4 M13 12h8a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z"></path></svg>
+        </button>
+        <button class="tab-close" title="关闭">×</button>
+      </div>
+      <div class="tab"><span class="tab-title">会话工作台</span><button class="tab-close" title="关闭">×</button></div>
+      <div class="tab"><span class="tab-title">模型管理</span><button class="tab-close" title="关闭">×</button></div>
+    </div>
+    <span class="titlebar-spacer"></span>
+    <button class="icon-btn" title="展开画布">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z M15 3v18"></path></svg>
+    </button>
+  </header>
+
+  <div class="shell" id="shell-after" hidden>
+    <aside class="sidebar">
+      <div class="nav-link on"><span class="nav-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>对话</div>
+      <div class="nav-link"><span class="nav-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>会话工作台</div>
+      <div class="nav-link"><span class="nav-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M2 12h20"/></svg></span>模型管理</div>
+      <div class="sb-group">最近会话</div>
+      <div class="sb-item"><span>查看当前目录文件</span><span class="dim">14 小时前</span></div>
+      <div class="sb-item"><span>新会话 137203</span><span class="dim">15 小时前</span></div>
+      <div class="user-bar">
+        <span class="user-bar-avatar">本</span>
+        <span class="user-bar-text"><span class="user-bar-name">本地用户</span><span class="user-bar-sub">Ava · 本地模式</span></span>
+      </div>
+    </aside>
+    <main class="main-area">
+      <div class="stage"><div class="pane" id="stage-b"></div></div>
+    </main>
+  </div>
+
+</div>
+
+<div class="ctl">
+  <button data-mode="before">合并前</button>
+  <button data-mode="after" class="on">合并后</button>
+  <span class="ctl-sep"></span>
+  <button data-theme="light" class="on">浅色</button>
+  <button data-theme="dark">深色</button>
+</div>
+
+<div class="ctl-note" id="note"></div>
+
+<script>
+const STAGE = `
+  <div class="msg">根目录文件包括 <code>package.json</code>、<code>.env.example</code>、<code>README.md</code> —— 项目配置与说明。</div>
+  <div class="msg" style="margin-top:12px">主要子目录：<b>server/</b>（Next.js 后端）、<b>web/</b>（前端聊天界面）、<b>ava_MKI/</b>（Blender 3D 角色项目）。</div>
+  <div class="msg-user"><div class="msg-bubble">收到。请只回复两个字：好的</div></div>
+  <div class="msg">好的</div>
+  <div class="composer">输入消息</div>`;
+document.querySelectorAll('.pane').forEach(p => p.innerHTML = STAGE);
+
+const NOTES = {
+  before: '<b>合并前</b>：titlebar 36px + tabbar 40px = 76px 纵向占用；标题区与 tab 区分两行，顶部信息密度低。',
+  after: '<b>合并后</b>：单行 40px（省 36px）；身份区（折叠钮/徽标/名称/状态/端点）+ 0.5px 竖分隔 + tab 列表 + 画布钮同排。'
+};
+
+function applyMode(m) {
+  document.body.dataset.mode = m;
+  document.querySelector('#shell-after').hidden = (m !== 'after');
+  document.querySelectorAll('.shell')[0].hidden = (m === 'after');
+  document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  document.getElementById('note').innerHTML = NOTES[m];
+}
+document.querySelectorAll('[data-mode]').forEach(b =>
+  b.addEventListener('click', () => applyMode(b.dataset.mode)));
+
+document.querySelectorAll('[data-theme]').forEach(b =>
+  b.addEventListener('click', () => {
+    document.documentElement.dataset.theme = b.dataset.theme;
+    document.querySelectorAll('[data-theme]').forEach(x => x.classList.toggle('on', x.dataset.theme === b.dataset.theme));
+  }));
+
+applyMode('after');
+</script>
+</body>
+</html>

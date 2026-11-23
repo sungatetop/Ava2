@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>代码考古 · RepoAtlas — ava2 创意示例</title>
+<link rel="stylesheet" href="shell.css" />
+<style>
+  :root{ --accent:#c2632a; }
+  .query{border:.5px solid var(--ava-border-l2);border-radius:var(--ava-r-md);padding:var(--ava-sp-3) var(--ava-sp-4);
+         display:flex;gap:var(--ava-sp-2);align-items:center;background:var(--ava-bg-layer-1)}
+  .query input{flex:1;height:32px;border:0;background:transparent;font:inherit;color:var(--ava-label-primary);outline:none}
+  .impact{margin-top:var(--ava-sp-3)}
+  .impact-row{display:flex;gap:var(--ava-sp-3);padding:var(--ava-sp-3) 0;border-bottom:.5px solid var(--ava-border-l1)}
+  .impact-row:last-child{border-bottom:0}
+  .impact-row .lvl{width:54px;flex:0 0 auto;font-size:11px;font-weight:600;letter-spacing:.02em}
+  .lvl.direct{color:var(--ava-danger)}
+  .lvl.indirect{color:var(--ava-warning)}
+  .lvl.test{color:var(--ava-success)}
+  .impact-row .body{flex:1;min-width:0}
+  .impact-row .body .file{font-family:var(--ava-font-mono);font-size:12px;color:var(--ava-label-primary)}
+  .impact-row .body .note{font-size:11px;color:var(--ava-label-tertiary);margin-top:2px}
+  .risk{display:flex;align-items:center;gap:8px;padding:var(--ava-sp-2) var(--ava-sp-3);border-radius:var(--ava-r-sm);
+        background:color-mix(in srgb,var(--ava-danger) 8%,transparent);font-size:12px;margin-top:var(--ava-sp-2)}
+  /* 架构地图 */
+  .mapwrap{position:relative;border-radius:var(--ava-r-md);background:var(--ava-bg-layer-1);
+           border:.5px solid var(--ava-border-l1);padding:var(--ava-sp-2)}
+  .module{cursor:pointer}
+  .module rect{fill:var(--ava-bg-layer-2);stroke:var(--ava-border-l2);stroke-width:1;rx:7}
+  .module:hover rect{stroke:var(--accent)}
+  .module.sel rect{fill:color-mix(in srgb,var(--accent) 14%,transparent);stroke:var(--accent);stroke-width:1.4}
+  .module text{fill:var(--ava-label-secondary);font-size:9.5px;font-family:var(--ava-font-mono);pointer-events:none}
+  .module.sel text{fill:var(--accent);font-weight:700}
+  .edge{stroke:var(--ava-border-l3);stroke-width:1;fill:none}
+  .edge.hot{stroke:var(--accent);stroke-width:1.6}
+  .legend{display:flex;gap:var(--ava-sp-3);font-size:10px;color:var(--ava-label-tertiary);margin-top:var(--ava-sp-2)}
+  .notes{counter-reset:n}
+  .note-item{border:.5px solid var(--ava-border-l2);border-radius:var(--ava-r-sm);padding:var(--ava-sp-2) var(--ava-sp-3);
+             margin-bottom:6px;font-size:12px;background:var(--ava-bg-layer-1)}
+  .note-item .h{display:flex;align-items:center;gap:6px;font-family:var(--ava-font-mono);font-size:11px;color:var(--ava-label-secondary)}
+  .note-item p{margin:4px 0 0;color:var(--ava-label-secondary);line-height:1.6}
+  .note-item.editable p{border-bottom:1px dashed var(--ava-border-l3)}
+  .heat{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ava-label-secondary);margin-top:6px}
+</style>
+</head>
+<body>
+<div class="app-root">
+  <header class="appbar">
+    <div class="brand"><span class="mark"></span>ava2<span class="dot"></span></div>
+    <span class="pill accent">代码考古 · RepoAtlas</span>
+    <span class="pill">开发者</span>
+    <div class="spacer"></div>
+    <button class="ghost-btn" onclick="toggleTheme()">切换主题</button>
+  </header>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="group-title">仓库</div>
+      <div class="nav-item active"><span class="ico" style="background:var(--accent);opacity:.9"></span>payments-core<span class="tail">Rust</span></div>
+      <div class="nav-item"><span class="ico"></span>web-console<span class="tail">TS</span></div>
+      <div class="nav-item"><span class="ico"></span>legacy-batch<span class="tail">Java</span></div>
+      <div class="group-title">考古工具</div>
+      <div class="nav-item"><span class="ico"></span>影响面分析</div>
+      <div class="nav-item"><span class="ico"></span>接手清单</div>
+      <div class="nav-item"><span class="ico"></span>可疑点扫描</div>
+      <div style="margin-top:auto">
+        <div class="card">
+          <div class="section-title">仓库体检</div>
+          <div class="kv"><span>模块</span><b class="mono">38</b></div>
+          <div class="kv"><span>源文件</span><b class="mono">412</b></div>
+          <div class="kv"><span>TODO</span><b class="mono">67</b></div>
+          <div class="kv"><span>最长函数</span><b class="mono">284 行</b></div>
+          <div class="bar" style="margin-top:6px"><i style="width:38%"></i></div>
+          <p class="muted" style="margin:6px 0 0;font-size:11px">理解成本偏高 · 建议先看 6 个核心模块</p>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="page-head">
+        <div style="flex:1">
+          <h1>改动影响面 · payments-core</h1>
+          <p>输入你想改的地方，先看清波及范围再动手</p>
+        </div>
+        <button class="ghost-btn">生成接手清单</button>
+      </div>
+
+      <div class="page-body">
+        <div class="query">
+          <span class="mono muted" style="font-size:12px">我想改</span>
+          <input value="settlement::apply_refund 的幂等键生成方式" />
+          <button class="primary-btn">分析影响面</button>
+        </div>
+
+        <div class="risk">
+          <span class="tag bad">高风险</span>
+          <span>退款路径被 6 处调用，其中 2 处在定时任务里；幂等键改动会与历史数据不兼容。</span>
+        </div>
+
+        <div class="impact">
+          <div class="section-title">直接依赖 · 3</div>
+          <div class="impact-row">
+            <div class="lvl direct">直接</div>
+            <div class="body">
+              <div class="file">crates/settlement/src/refund.rs:118</div>
+              <div class="note">幂等键在 apply_refund 内生成，调用方全部依赖其格式。</div>
+            </div>
+          </div>
+          <div class="impact-row">
+            <div class="lvl direct">直接</div>
+            <div class="body">
+              <div class="file">crates/api/src/handlers/refund.rs:44</div>
+              <div class="note">对外 HTTP 入口，返回体里带 out_refund_no，改动会影响客户端缓存。</div>
+            </div>
+          </div>
+          <div class="impact-row">
+            <div class="lvl direct">直接</div>
+            <div class="body">
+              <div class="file">crates/jobs/src/retry_refund.rs:27</div>
+              <div class="note">定时重试任务，历史数据用旧键去重，切换需双写过渡。</div>
+            </div>
+          </div>
+
+          <div class="section-title" style="margin-top:var(--ava-sp-4)">间接影响 · 4</div>
+          <div class="impact-row">
+            <div class="lvl indirect">间接</div>
+            <div class="body">
+              <div class="file">crates/report/src/daily.rs:210</div>
+              <div class="note">日报按 out_refund_no 去重，格式变化会重复计数。</div>
+            </div>
+          </div>
+          <div class="impact-row">
+            <div class="lvl indirect">间接</div>
+            <div class="body">
+              <div class="file">crates/notify/src/refund_mail.rs:63</div>
+              <div class="note">邮件里引用退款单号，用户可见。</div>
+            </div>
+          </div>
+          <div class="impact-row">
+            <div class="lvl indirect">间接</div>
+            <div class="body">
+              <div class="file">crates/compat/src/legacy_key.rs:12</div>
+              <div class="note">旧键解析逻辑，删除前需确认无存量数据。</div>
+            </div>
+          </div>
+          <div class="impact-row">
+            <div class="lvl indirect">间接</div>
+            <div class="body">
+              <div class="file">docs/runbook/refund.md</div>
+              <div class="note">运维手册描述了键格式，需同步更新。</div>
+            </div>
+          </div>
+
+          <div class="section-title" style="margin-top:var(--ava-sp-4)">需要补的测试 · 2</div>
+          <div class="impact-row">
+            <div class="lvl test">测试</div>
+            <div class="body">
+              <div class="file">tests/refund_idempotent.rs · 不存在</div>
+              <div class="note">建议补：同单重复退款只产生一条记录。</div>
+            </div>
+          </div>
+          <div class="impact-row">
+            <div class="lvl test">测试</div>
+            <div class="body">
+              <div class="file">tests/legacy_key_compat.rs · 已存在但未覆盖新格式</div>
+              <div class="note">建议补：新旧键共存期间的去重一致性。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-bottom">
+        <div class="row" style="justify-content:space-between;margin-bottom:var(--ava-sp-2)">
+          <span class="section-title" style="margin:0">考古笔记（Agent 生成 · 可编辑）</span>
+          <span class="pill">setPlan → 3 步</span>
+        </div>
+        <div class="notes" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="note-item"><div class="h">settlement</div><p>结算核心：金额拆分与退款落账。职责清晰，但幂等逻辑与外部单号耦合。</p></div>
+          <div class="note-item editable"><div class="h">jobs</div><p>定时任务集合，重试依赖幂等键，是最容易被遗忘的调用方。</p></div>
+          <div class="note-item"><div class="h">compat</div><p>历史兼容层，仅剩旧键解析；无新写入。</p></div>
+          <div class="note-item editable"><div class="h">可疑点</div><p>refund.rs 的键生成函数嵌套 4 层条件，建议改前先抽纯函数。</p></div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="canvas-side">
+      <div class="canvas-head">
+        <span class="pill active" style="background:var(--ava-nav-active);color:var(--ava-label-primary)">架构地图</span>
+        <span class="pill">按目录聚类</span>
+        <div class="spacer"></div>
+        <span class="muted" style="font-size:11px">repo-atlas</span>
+      </div>
+      <div class="canvas-body">
+        <div class="mapwrap">
+          <svg viewBox="0 0 380 300" style="width:100%;height:auto">
+            <defs>
+              <marker id="ar" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M0,0 L6,3 L0,6 z" fill="var(--ava-border-l3)" />
+              </marker>
+            </defs>
+            <!-- edges -->
+            <path class="edge hot" d="M96,64 L188,110" marker-end="url(#ar)" />
+            <path class="edge hot" d="M206,128 L268,72" marker-end="url(#ar)" />
+            <path class="edge" d="M200,140 L200,196" marker-end="url(#ar)" />
+            <path class="edge" d="M96,78 L92,180" marker-end="url(#ar)" />
+            <path class="edge" d="M110,196 L174,218" marker-end="url(#ar)" />
+            <path class="edge" d="M274,90 L246,196" marker-end="url(#ar)" />
+            <path class="edge" d="M280,208 L236,232" marker-end="url(#ar)" />
+            <!-- modules -->
+            <g class="module"><rect x="30" y="40" width="86" height="34" rx="7" /><text x="43" y="61">api</text></g>
+            <g class="module sel"><rect x="160" y="104" width="96" height="36" rx="7" /><text x="173" y="126">settlement</text></g>
+            <g class="module"><rect x="252" y="46" width="86" height="34" rx="7" /><text x="265" y="67">report</text></g>
+            <g class="module"><rect x="152" y="196" width="92" height="34" rx="7" /><text x="165" y="217">jobs</text></g>
+            <g class="module"><rect x="34" y="180" width="96" height="34" rx="7" /><text x="47" y="201">compat</text></g>
+            <g class="module"><rect x="278" y="196" width="82" height="34" rx="7" /><text x="291" y="217">notify</text></g>
+            <g class="module"><rect x="150" y="252" width="86" height="30" rx="7" /><text x="163" y="271">tests</text></g>
+          </svg>
+        </div>
+        <div class="legend">
+          <span>— 调用/依赖</span>
+          <span style="color:var(--accent)">— 本次改动波及</span>
+        </div>
+        <div class="divider"></div>
+        <div class="section-title">模块热度（近 90 天变更）</div>
+        <div class="heat"><span style="width:64px">settlement</span><div class="bar" style="flex:1"><i style="width:88%"></i></div><span class="mono">41</span></div>
+        <div class="heat"><span style="width:64px">api</span><div class="bar" style="flex:1"><i style="width:62%"></i></div><span class="mono">28</span></div>
+        <div class="heat"><span style="width:64px">jobs</span><div class="bar" style="flex:1"><i style="width:34%"></i></div><span class="mono">15</span></div>
+        <div class="heat"><span style="width:64px">report</span><div class="bar" style="flex:1"><i style="width:21%"></i></div><span class="mono">9</span></div>
+      </div>
+      <div class="panel-bottom">
+        <div class="section-title">选中模块 · settlement</div>
+        <div class="card" style="margin:0">
+          <p class="muted" style="margin:0;font-size:12px">12 个文件 · 2,840 行 · 被 6 处引用。最近一次变更：3 天前（退款幂等修复）。</p>
+          <div class="row" style="margin-top:8px;gap:6px">
+            <span class="tag bad">高风险</span><span class="tag warn">TODO × 9</span><span class="tag">覆盖 71%</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+<script>
+function toggleTheme(){var e=document.documentElement;e.dataset.theme=e.dataset.theme==="dark"?"light":"dark";}
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "@ava2-app/chatapp",
+  "private": true,
+  "version": "0.9.7",
+  "description": "ava2 AppHost 试点 App：独立 TS 构建的对话 App（react external，经 /v1/apps/install 安装）",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  },
+  "dependencies": {
+    "@ava-ai/app-sdk": "file:../../packages/app-sdk",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  }
+}

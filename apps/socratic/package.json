@@ -1,0 +1,15 @@
+{
+  "name": "@ava2-app/socratic",
+  "private": true,
+  "version": "0.3.0",
+  "description": "苏格拉底实验室示例 App：追问式对话 + 解题板书 + 掌握度热力（教育场景）。",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  }
+}

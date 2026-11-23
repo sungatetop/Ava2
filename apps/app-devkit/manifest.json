@@ -1,0 +1,17 @@
+{
+  "id": "app-devkit",
+  "name": "App 开发套件",
+  "version": "0.1.7",
+  "hostApi": 2,
+  "kind": "preset",
+  "description": "ava2 App 开发技能包（自包含）：契约 SPEC / 完整开发规范 / 设计基准 / 图标规范随技能分发；覆盖产物形态、manifest/setup、ctx.net 联网服务、contributes、安装调试与错误码。",
+  "author": "Ava Team",
+  "homepage": "https://github.com/ava-labs/ava2",
+  "license": "MIT",
+  "icon": "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z",
+  "entry": "app.js",
+  "inject": [],
+  "contributes": {
+    "skills": ["skills"]
+  }
+}

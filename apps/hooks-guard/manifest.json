@@ -1,0 +1,11 @@
+{
+  "id": "hooks-guard",
+  "name": "Hooks 守卫示例",
+  "version": "0.1.0",
+  "hostApi": 2,
+  "inject": [],
+  "entry": "app.js",
+  "contributes": {
+    "hooks": { "path": "hooks.json" }
+  }
+}

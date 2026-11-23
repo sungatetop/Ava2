@@ -1,0 +1,15 @@
+{
+  "name": "@ava2-app/storyloom",
+  "private": true,
+  "version": "0.3.0",
+  "description": "故事织机示例 App：节拍板 × 稿纸二分屏 + 角色关系画布（内容创作场景）。",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  }
+}

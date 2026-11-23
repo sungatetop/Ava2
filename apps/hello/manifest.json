@@ -1,0 +1,12 @@
+{
+  "id": "hello",
+  "name": "契约冒烟",
+  "version": "0.1.0",
+  "hostApi": 2,
+  "kind": "demo",
+  "inject": ["slots", "events", "agent"],
+  "surfaces": ["surface.main", "surface.canvas", "panel.canvas", "nav.sidebar"],
+  "contributes": {
+    "apps": [{ "id": "main", "entry": "app.js" }]
+  }
+}

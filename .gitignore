@@ -1,0 +1,62 @@
+# Rust workspace 构建产物
+/target
+
+# 发布签名私钥（严禁入库）
+scripts/keys/
+
+# 本地发布凭据（OSS AccessKey / 签名密码，严禁入库）
+scripts/publish.local.ps1
+
+# 本地模型默认值（内网 base_url / api_key，严禁入库）
+local-defaults.json
+.onion-test/
+
+# ossutil 二进制（从 ava 项目复制或官方下载，不入库）
+scripts/ossutil.exe
+scripts/ossutil64.exe
+ossutil64.exe
+
+# 边车构建产物（由 dev.ps1 / publish.ps1 构建后拷贝，不入库）
+src-tauri/resources/onion-server.exe
+src-tauri/resources/onion-server
+src-tauri/resources/onion-sandbox.exe
+# 发布时被占用 exe 的改名残留（Copy-ExeTolerant 产生）
+src-tauri/resources/*.exe.old
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# vendor ESM 构建产物（npm run vendor 从 vendor-src 再生，不入库）
+src/vendor/
+
+# 本地调试数据（ONION_HOME 指向仓库内 .onion-test，防止误入仓库）
+# 冒烟示例（examples/smoke.rs）运行时产生的演示会话数据
+crates/onion-sdk-client/.onion-demo/
+
+# CDP 冒烟脚本与截图（本地验证用，不入库）
+.ava2-smoke/
+
+# 发布产物（scripts/publish.ps1 输出：安装包 / manifest / sha256）
+/release/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

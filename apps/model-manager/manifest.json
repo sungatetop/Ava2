@@ -1,0 +1,16 @@
+{
+  "id": "model-manager",
+  "name": "模型管理",
+  "version": "0.2.0",
+  "description": "管理供应商与模型目录：添加模型、设默认模型、测试连接。",
+  "author": "Ava Team",
+  "homepage": "https://github.com/ava-labs/ava2",
+  "license": "MIT",
+  "icon": "M21 4h-7 M10 4H3 M21 12h-9 M8 12H3 M21 20h-5 M12 20H3 M14 2v4 M8 10v4 M16 18v4",
+  "hostApi": 2,
+  "inject": ["slots", "agent"],
+  "surfaces": ["surface.main", "nav.sidebar"],
+  "contributes": {
+    "apps": [{ "id": "main", "entry": "main.js" }]
+  }
+}

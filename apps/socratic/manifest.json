@@ -1,0 +1,13 @@
+{
+  "id": "socratic",
+  "name": "苏格拉底实验室",
+  "version": "0.3.0",
+  "hostApi": 2,
+  "description": "选工作区题目文件，由真实 agent 会话追问引导（只提问不给答案）；画布沉淀真实推理板书与掌握度。面向教师与学生。",
+  "author": "Ava Team",
+  "license": "MIT",
+  "icon": "M14 2a1 1 0 0 1 1 1v2.1c1.8.3 3 1.9 3 3.9s-1.2 3.6-3 3.9V21a1 1 0 0 1-2 0v-8.1c-1.8-.3-3-1.9-3-3.9s1.2-3.6 3-3.9V3a1 1 0 0 1 1-1zm0 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM5 8a1 1 0 0 1 1 1 1 1 0 0 1-1 1H4a1 1 0 0 1 0-2h1z",
+  "inject": ["slots", "agent", "events", "storage"],
+  "surfaces": ["surface.main", "surface.canvas", "nav.sidebar", "panel.sidebar", "panel.canvas"],
+  "entry": "main.js"
+}

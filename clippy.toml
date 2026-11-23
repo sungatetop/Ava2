@@ -1,0 +1,15 @@
+# Clippy 自定义配置。
+
+# 测试中允许 unwrap/expect（生产代码仍由 workspace.lints.clippy 强制 deny）。
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
+
+# await 期间持有的类型（防止跨 await 持锁/持 guard）。
+await-holding-invalid-types = [
+    "tokio::sync::MutexGuard",
+    "tokio::sync::RwLockReadGuard",
+    "tokio::sync::RwLockWriteGuard",
+]
+
+# 放宽 result_large_err 阈值以容纳更丰富的错误变体。
+large-error-threshold = 256

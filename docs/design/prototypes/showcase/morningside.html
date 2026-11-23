@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>晨间简报 · Morningside — ava2 创意示例</title>
+<link rel="stylesheet" href="shell.css" />
+<style>
+  :root{ --accent:#4176e6; }
+  .brief-head{padding:var(--ava-sp-5) var(--ava-sp-6) var(--ava-sp-3)}
+  .brief-head h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.4px}
+  .brief-head p{margin:6px 0 0;color:var(--ava-label-secondary);font-size:13px}
+  .cards{display:flex;flex-direction:column;gap:var(--ava-sp-3);padding:0 var(--ava-sp-6) var(--ava-sp-6)}
+  .bcard{border:.5px solid var(--ava-border-l2);border-radius:var(--ava-r-lg);padding:var(--ava-sp-4);
+         background:var(--ava-bg-layer-1)}
+  .bcard > .head{display:flex;align-items:center;gap:var(--ava-sp-2);margin-bottom:var(--ava-sp-3)}
+  .bcard > .head .t{font-size:12px;font-weight:600}
+  .bcard > .head .spacer{flex:1}
+  .focus-list{display:flex;flex-direction:column;gap:2px}
+  .focus{display:flex;align-items:flex-start;gap:var(--ava-sp-3);padding:var(--ava-sp-2) 0}
+  .focus .idx{width:22px;height:22px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;
+              font-size:11px;font-weight:700;background:var(--ava-hover);color:var(--ava-label-secondary)}
+  .focus.hot .idx{background:var(--ava-business);color:#fff}
+  .focus .body{flex:1;min-width:0}
+  .focus .body b{display:block;font-size:13px;font-weight:600}
+  .focus .body span{font-size:11px;color:var(--ava-label-tertiary)}
+  .focus .why{font-size:11px;color:var(--ava-label-secondary);margin-top:3px;padding-left:var(--ava-sp-4);
+              border-left:2px solid var(--ava-border-l2)}
+  .decision{border:.5px solid color-mix(in srgb,var(--ava-warning) 40%,transparent);border-radius:var(--ava-r-md);
+            background:color-mix(in srgb,var(--ava-warning) 7%,transparent);padding:var(--ava-sp-3)}
+  .decision h4{margin:0 0 6px;font-size:13px;font-weight:600}
+  .decision .opts{display:flex;gap:var(--ava-sp-2);margin-top:var(--ava-sp-2);flex-wrap:wrap}
+  .opt{height:28px;padding:0 var(--ava-sp-4);border-radius:999px;border:.5px solid var(--ava-border-l2);
+       background:var(--ava-bg-layer-1);font:inherit;font-size:12px;cursor:pointer;color:var(--ava-label-primary)}
+  .opt:hover{border-color:var(--ava-business);color:var(--ava-business)}
+  .opt.main{background:var(--ava-business);border-color:var(--ava-business);color:#fff}
+  .approval{display:flex;align-items:center;gap:var(--ava-sp-3);padding:var(--ava-sp-2) 0;border-bottom:.5px solid var(--ava-border-l1)}
+  .approval:last-child{border-bottom:0}
+  .approval .body{flex:1;min-width:0;font-size:12px}
+  .approval .body b{display:block;font-size:12px;font-weight:600}
+  .approval .body span{font-size:11px;color:var(--ava-label-tertiary)}
+  .mini-btn{height:24px;padding:0 10px;border-radius:999px;border:.5px solid var(--ava-border-l2);background:transparent;
+            font:inherit;font-size:11px;cursor:pointer;color:var(--ava-label-secondary)}
+  .mini-btn:hover{background:var(--ava-hover)}
+  .mini-btn.go{color:var(--ava-success);border-color:color-mix(in srgb,var(--ava-success) 40%,transparent)}
+  /* 目标环 */
+  .ring{width:104px;height:104px;margin:0 auto;display:block}
+  .timer{display:flex;flex-direction:column;gap:6px;margin-top:var(--ava-sp-3)}
+  .timer .rowline{display:flex;justify-content:space-between;font-size:12px;color:var(--ava-label-secondary)}
+  /* 时间轴 */
+  .timeline{position:relative;padding-left:52px}
+  .tl-hour{position:relative;height:44px}
+  .tl-hour .lb{position:absolute;left:-52px;top:-6px;font-family:var(--ava-font-mono);font-size:10px;color:var(--ava-label-tertiary)}
+  .tl-hour .ln{position:absolute;left:-8px;right:0;top:0;height:1px;background:var(--ava-border-l1)}
+  .block{position:absolute;left:0;right:0;border-radius:var(--ava-r-sm);padding:4px 8px;font-size:11px;
+         border-left:2px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);
+         color:var(--ava-label-primary);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .block.alt{border-left-color:var(--ava-warning);background:color-mix(in srgb,var(--ava-warning) 10%,transparent)}
+  .block.now{border-left-color:var(--ava-danger);background:color-mix(in srgb,var(--ava-danger) 10%,transparent)}
+  .nowline{position:absolute;left:0;right:0;height:1.5px;background:var(--ava-danger);opacity:.7}
+  .nowline::before{content:"";position:absolute;left:-4px;top:-2.5px;width:6px;height:6px;border-radius:50%;background:var(--ava-danger)}
+  .inbox{display:flex;gap:var(--ava-sp-2);margin-top:var(--ava-sp-2)}
+  .inbox input{flex:1;height:30px;border-radius:999px;border:.5px solid var(--ava-border-l2);background:var(--ava-bg-layer-1);
+               padding:0 var(--ava-sp-3);font:inherit;font-size:12px;color:var(--ava-label-primary)}
+</style>
+</head>
+<body>
+<div class="app-root">
+  <header class="appbar">
+    <div class="brand"><span class="mark"></span>ava2<span class="dot"></span></div>
+    <span class="pill accent">晨间简报 · Morningside</span>
+    <span class="pill">通用</span>
+    <div class="spacer"></div>
+    <button class="ghost-btn" onclick="toggleTheme()">切换主题</button>
+  </header>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="group-title">简报</div>
+      <div class="nav-item active"><span class="ico" style="background:var(--accent);opacity:.9"></span>今日<span class="tail">11/11</span></div>
+      <div class="nav-item"><span class="ico"></span>本周回顾</div>
+      <div class="nav-item"><span class="ico"></span>收件箱<span class="tail">4</span></div>
+      <div class="group-title">我的</div>
+      <div class="nav-item"><span class="ico"></span>目标</div>
+      <div class="nav-item"><span class="ico"></span>专注记录</div>
+      <div class="nav-item"><span class="ico"></span>偏好设置</div>
+      <div style="margin-top:auto">
+        <div class="card">
+          <div class="section-title">专注时长 · 今日</div>
+          <div class="kv"><span>已完成</span><b class="mono">2h 10m</b></div>
+          <div class="bar" style="margin-top:6px"><i style="width:54%"></i></div>
+          <p class="muted" style="margin:6px 0 0;font-size:11px">目标 4h · 还差 1h 50m</p>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="brief-head">
+        <span class="pill">星期二 · 晴 · 09:42</span>
+        <h1 style="margin-top:8px">早上好。今天有三件事值得先做。</h1>
+        <p>简报由你的会话、待办与目标汇总而成；点任意一条即可展开上下文。</p>
+      </div>
+
+      <div class="cards">
+        <section class="bcard">
+          <div class="head">
+            <span class="t">今日三件要事</span>
+            <span class="pill">来自 goal + todo</span>
+            <div class="spacer"></div>
+            <span class="tag">日报截止 18:00</span>
+          </div>
+          <div class="focus-list">
+            <div class="focus hot">
+              <div class="idx">1</div>
+              <div class="body">
+                <b>把 Q3 门店分析结论发给运营</b>
+                <span>截止 18:00 · 关联会话「门店日销分析」</span>
+                <div class="why">昨天已生成 3 条结论，缺一段「建议动作」，需要你先定口径。</div>
+              </div>
+            </div>
+            <div class="focus">
+              <div class="idx">2</div>
+              <div class="body">
+                <b>审阅还款服务重构方案</b>
+                <span>待你回复 · 阻塞 2 人</span>
+                <div class="why">方案文档已在工作区，风险点集中在幂等键迁移。</div>
+              </div>
+            </div>
+            <div class="focus">
+              <div class="idx">3</div>
+              <div class="body">
+                <b>确认下周评审议程</b>
+                <span>可推迟到明天 · 无阻塞</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="bcard">
+          <div class="head"><span class="t">需要你决策的一个问题</span><div class="spacer"></div><span class="tag warn">1</span></div>
+          <div class="decision">
+            <h4>Q3 分析里那条「异常尖峰」结论，要不要保留？</h4>
+            <p class="muted" style="margin:0;font-size:12px">保留会更完整，但置信度仅 41%，可能引发追问；剔除则报告更快发出。</p>
+            <div class="opts">
+              <button class="opt main">保留并标注置信度</button>
+              <button class="opt">剔除，另附备注</button>
+              <button class="opt">先核原始小票</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="bcard">
+          <div class="head"><span class="t">待回填 · 2 项</span><div class="spacer"></div><span class="pill">getPending</span></div>
+          <div class="approval">
+            <div class="body"><b>run: 依赖升级 · tokio 1.4x</b><span>请求执行 3 条命令 · 会话「payments-core」</span></div>
+            <button class="mini-btn go">批准</button>
+            <button class="mini-btn">拒绝</button>
+          </div>
+          <div class="approval">
+            <div class="body"><b>plan: 退款幂等迁移三步</b><span>等待你确认计划 · 会话「接手 payments-core」</span></div>
+            <button class="mini-btn go">确认计划</button>
+            <button class="mini-btn">修改</button>
+          </div>
+        </section>
+
+        <section class="bcard">
+          <div class="head"><span class="t">昨日进展</span><div class="spacer"></div><span class="pill">listSessions · 5</span></div>
+          <p style="margin:0;font-size:12px;color:var(--ava-label-secondary);line-height:1.9">
+            完成门店日销分析（3 条洞察）· 修复退款幂等缺陷并合并 · 与设计确认简报卡片密度 ·
+            阅读 2 篇关于评估体系的文章（已存入记忆）· 起草周报框架（未完成）。
+          </p>
+        </section>
+      </div>
+    </main>
+
+    <aside class="canvas-side">
+      <div class="canvas-head">
+        <span class="pill active" style="background:var(--ava-nav-active);color:var(--ava-label-primary)">今日时间轴</span>
+        <span class="pill">日程</span>
+        <div class="spacer"></div>
+        <span class="muted" style="font-size:11px">morning-timeline</span>
+      </div>
+      <div class="canvas-body">
+        <div class="timeline">
+          <div class="tl-hour"><span class="lb">09:00</span><span class="ln"></span>
+            <div class="block" style="top:4px;height:34px">09:30 站会 · 15m</div>
+          </div>
+          <div class="tl-hour"><span class="lb">10:00</span><span class="ln"></span>
+            <div class="block" style="top:2px;height:76px">10:00 – 11:30 专注：Q3 分析结论</div>
+            <div class="nowline" style="top:42px"></div>
+          </div>
+          <div class="tl-hour"><span class="lb">11:00</span><span class="ln"></span></div>
+          <div class="tl-hour"><span class="lb">12:00</span><span class="ln"></span>
+            <div class="block alt" style="top:8px;height:34px">12:30 午餐 · 与产品</div>
+          </div>
+          <div class="tl-hour"><span class="lb">13:00</span><span class="ln"></span></div>
+          <div class="tl-hour"><span class="lb">14:00</span><span class="ln"></span>
+            <div class="block" style="top:4px;height:56px">14:00 – 15:00 重构方案评审</div>
+          </div>
+          <div class="tl-hour"><span class="lb">15:00</span><span class="ln"></span></div>
+          <div class="tl-hour"><span class="lb">16:00</span><span class="ln"></span>
+            <div class="block alt" style="top:6px;height:34px">16:30 1:1 · 张弛</div>
+          </div>
+          <div class="tl-hour"><span class="lb">17:00</span><span class="ln"></span>
+            <div class="block now" style="top:4px;height:44px">17:30 日报截止 · 需留 30m</div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="section-title">冲突提醒</div>
+        <div class="card" style="margin:0">
+          <p class="muted" style="margin:0;font-size:12px">「专注：Q3 分析结论」与 11:00 的临时评审重叠 30 分钟，建议把评审移到 14:00 合并。</p>
+        </div>
+        <div class="divider"></div>
+        <div class="section-title">快捷记录 → 收件箱</div>
+        <div class="inbox">
+          <input placeholder="一句话丢进来，稍后归类……" />
+          <button class="mini-btn">记录</button>
+        </div>
+      </div>
+      <div class="panel-bottom">
+        <div class="section-title">目标进度</div>
+        <svg class="ring" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="40" fill="none" stroke="var(--ava-hover)" stroke-width="9" />
+          <circle cx="50" cy="50" r="40" fill="none" stroke="var(--accent)" stroke-width="9"
+                  stroke-linecap="round" stroke-dasharray="251.2" stroke-dashoffset="82"
+                  transform="rotate(-90 50 50)" />
+          <text x="50" y="47" text-anchor="middle" style="font-size:17px;font-weight:700;fill:var(--ava-label-primary)">67%</text>
+          <text x="50" y="63" text-anchor="middle" style="font-size:8px;fill:var(--ava-label-tertiary)">Q4 目标</text>
+        </svg>
+        <div class="timer">
+          <div class="rowline"><span>本周关键结果</span><b class="mono">4 / 6</b></div>
+          <div class="timer"><div class="bar"><i style="width:67%"></i></div></div>
+          <div class="rowline" style="margin-top:4px"><span>偏离风险</span><span class="tag warn">1 项滞后</span></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+<script>
+function toggleTheme(){var e=document.documentElement;e.dataset.theme=e.dataset.theme==="dark"?"light":"dark";}
+</script>
+</body>
+</html>

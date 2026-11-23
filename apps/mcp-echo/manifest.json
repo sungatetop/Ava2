@@ -1,0 +1,18 @@
+{
+  "id": "mcp-echo",
+  "name": "MCP Echo 示例",
+  "version": "0.1.0",
+  "hostApi": 2,
+  "inject": [],
+  "entry": "app.js",
+  "contributes": {
+    "mcpServers": [
+      {
+        "name": "echo",
+        "command": "node",
+        "args": ["${CLAUDE_PLUGIN_ROOT}/server.mjs"],
+        "toolCallTimeoutMs": 10000
+      }
+    ]
+  }
+}

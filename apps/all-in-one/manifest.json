@@ -1,0 +1,26 @@
+{
+  "id": "all-in-one",
+  "name": "全组合示例",
+  "version": "0.1.1",
+  "hostApi": 2,
+  "inject": ["slots", "agent"],
+  "surfaces": ["surface.main", "nav.sidebar"],
+  "contributes": {
+    "apps": [{ "id": "main", "entry": "app.js" }],
+    "skills": ["skills"],
+    "mcpServers": [
+      {
+        "name": "toolbox",
+        "command": "node",
+        "args": ["${CLAUDE_PLUGIN_ROOT}/server.mjs"],
+        "toolCallTimeoutMs": 10000
+      }
+    ],
+    "hooks": [
+      {
+        "event": "UserPromptSubmit",
+        "handler": { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/context.mjs\"" }
+      }
+    ]
+  }
+}

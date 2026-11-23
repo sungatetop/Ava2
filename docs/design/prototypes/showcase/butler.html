@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>总管家 · Butler — ava2 创意示例</title>
+<link rel="stylesheet" href="shell.css" />
+<style>
+  :root{ --accent:#2e7d63; }
+  /* 管家状态条（对齐 ava-app §5.9 悬浮窗信息架构第 1 条） */
+  .butler-status{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--ava-r-md);
+                 background:var(--ava-hover);margin-bottom:var(--ava-sp-3)}
+  .butler-status .ava{width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;
+                      display:grid;place-items:center;font-size:12px;font-weight:700;flex:0 0 auto}
+  .butler-status .who{font-size:12px;font-weight:600}
+  .butler-status .state{font-size:11px;color:var(--ava-label-tertiary)}
+  .dotstate{width:7px;height:7px;border-radius:50%;background:var(--ava-success);flex:0 0 auto}
+  .dotstate.busy{background:var(--accent);animation:pulse 1.6s infinite}
+  .dotstate.wait{background:var(--ava-warning)}
+  @keyframes pulse{50%{opacity:.35}}
+  /* 派发会话卡行（roster 投影） */
+  .roster{display:flex;flex-direction:column;gap:4px}
+  .rrow{border:.5px solid var(--ava-border-l2);border-radius:var(--ava-r-md);padding:8px 10px;
+        background:var(--ava-bg-layer-1);cursor:pointer;display:flex;gap:8px;align-items:center}
+  .rrow:hover{border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
+  .rrow .sdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:var(--ava-border-l3)}
+  .rrow .sdot.run{background:var(--accent)}
+  .rrow .sdot.done{background:var(--ava-success)}
+  .rrow .sdot.lift{background:var(--ava-warning)}
+  .rrow .body{flex:1;min-width:0}
+  .rrow .task{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rrow .meta{font-size:10.5px;color:var(--ava-label-tertiary);margin-top:2px;font-family:var(--ava-font-mono)}
+  .rrow .open{font-size:11px;color:var(--ava-label-tertiary);cursor:pointer}
+  /* 对话流（微信式，表达与执行分离） */
+  .conv{max-width:640px;display:flex;flex-direction:column;gap:var(--ava-sp-3)}
+  .bub{display:flex;gap:8px;max-width:88%}
+  .bub .pic{width:26px;height:26px;border-radius:8px;flex:0 0 auto;display:grid;place-items:center;
+            font-size:11px;font-weight:700;color:#fff;background:var(--accent)}
+  .bub.me{flex-direction:row-reverse;align-self:flex-end;max-width:80%}
+  .bub.me .pic{background:var(--ava-label-tertiary)}
+  .bub .txt{background:var(--ava-bg-layer-1);border:.5px solid var(--ava-border-l2);border-radius:var(--ava-r-md);
+            padding:8px 12px;font-size:13px;line-height:1.75}
+  .bub.me .txt{background:color-mix(in srgb,var(--accent) 8%,transparent);border-color:transparent}
+  .bub .who{font-size:10px;color:var(--ava-label-tertiary);margin-bottom:2px;letter-spacing:.03em}
+  /* 委派动作条（对齐 ava-app「已创建会话」内联回复） */
+  .actionbar{border:.5px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:var(--ava-r-md);
+             background:color-mix(in srgb,var(--accent) 7%,transparent);padding:8px 12px;font-size:12px;line-height:1.7}
+  .actionbar b{color:var(--accent)}
+  .actionbar .act{display:inline-flex;align-items:center;gap:6px;margin-left:8px;height:22px;padding:0 10px;
+                  border-radius:999px;background:var(--accent);color:#fff;font-size:11px;cursor:pointer}
+  /* L4 升级卡（对齐 §5.6.1 通知卡片：哪个会话 + 工具 + 风险 + 建议 + 转到会话） */
+  .escalation{border:.5px solid color-mix(in srgb,var(--ava-warning) 55%,transparent);border-radius:var(--ava-r-lg);
+              background:color-mix(in srgb,var(--ava-warning) 6%,transparent);padding:12px 14px;max-width:88%}
+  .escalation .tagline{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+                       color:var(--ava-warning);letter-spacing:.04em}
+  .escalation h4{margin:6px 0 4px;font-size:13px;font-weight:600}
+  .escalation .meta{font-size:11px;color:var(--ava-label-secondary);line-height:1.7}
+  .escalation .acts{display:flex;gap:8px;margin-top:8px}
+  .btn-go{height:26px;padding:0 12px;border-radius:999px;border:0;background:var(--ava-business);color:#fff;
+          font:inherit;font-size:11px;font-weight:600;cursor:pointer}
+  .btn-ghost{height:26px;padding:0 12px;border-radius:999px;border:.5px solid var(--ava-border-l2);
+             background:transparent;color:var(--ava-label-secondary);font:inherit;font-size:11px;cursor:pointer}
+  /* 晨报卡 */
+  .morning{border:.5px solid var(--ava-border-l2);border-radius:var(--ava-r-md);padding:10px 12px;
+           background:var(--ava-bg-layer-1);max-width:88%}
+  .morning h5{margin:0 0 6px;font-size:12px;font-weight:600}
+  .morning ul{margin:0;padding-left:16px;font-size:12px;color:var(--ava-label-secondary);line-height:1.9}
+  /* 输入条 */
+  .inputbar{display:flex;gap:8px;margin-top:var(--ava-sp-4)}
+  .inputbar input{flex:1;height:34px;border-radius:999px;border:.5px solid var(--ava-border-l2);
+                  background:var(--ava-bg-layer-1);padding:0 14px;font:inherit;font-size:13px;color:var(--ava-label-primary)}
+  .inputbar .at{display:inline-flex;align-items:center;height:34px;border-radius:999px;border:.5px dashed var(--ava-border-l3);
+                padding:0 10px;font-size:11px;color:var(--ava-label-tertiary);background:transparent}
+  /* 派发看板（画布） */
+  .board{display:flex;flex-direction:column;gap:var(--ava-sp-2)}
+  .brow{border:.5px solid var(--ava-border-l2);border-radius:var(--ava-r-md);padding:8px 10px;background:var(--ava-bg-layer-1)}
+  .brow .hd{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+  .brow .hd .tag{margin-left:auto}
+  .brow .bar{margin-top:6px}
+  .brow .foot{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ava-label-tertiary);margin-top:4px;
+              font-family:var(--ava-font-mono)}
+  /* 信箱事件流水（只读） */
+  .mailitem{border:.5px solid var(--ava-border-l1);border-radius:var(--ava-r-sm);padding:7px 10px;margin-bottom:6px;
+            font-size:12px;background:var(--ava-bg-layer-1);line-height:1.6}
+  .mailitem .lv{display:inline-flex;height:16px;align-items:center;padding:0 5px;border-radius:4px;font-size:9.5px;
+                font-weight:700;letter-spacing:.04em;margin-right:6px;color:#fff}
+  .mailitem .lv.L2{background:var(--ava-business)}
+  .mailitem .lv.L3{background:var(--ava-warning)}
+  .mailitem .lv.L4{background:var(--ava-danger)}
+  .mailitem .st{font-size:10.5px;color:var(--ava-label-tertiary);display:block;margin-top:3px;font-family:var(--ava-font-mono)}
+  .mailitem .st.ok{color:var(--ava-success)}
+  /* 注意力设置 */
+  .set-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:.5px solid var(--ava-border-l1);
+           font-size:12px}
+  .set-row:last-child{border-bottom:0}
+  .set-row .lbl{color:var(--ava-label-secondary)}
+  .switch{width:32px;height:18px;border-radius:999px;background:var(--ava-border-l3);position:relative;cursor:pointer;flex:0 0 auto}
+  .switch.on{background:var(--ava-success)}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+                 background:#fff;transition:left .15s}
+  .switch.on::after{left:16px}
+  .seg{display:flex;border:.5px solid var(--ava-border-l2);border-radius:999px;overflow:hidden}
+  .seg button{flex:1;height:24px;border:0;background:transparent;font:inherit;font-size:10.5px;cursor:pointer;
+              color:var(--ava-label-secondary)}
+  .seg button.on{background:var(--ava-nav-active);color:var(--ava-label-primary);font-weight:600}
+</style>
+</head>
+<body>
+<div class="app-root">
+  <header class="appbar">
+    <div class="brand"><span class="mark"></span>ava2<span class="dot"></span></div>
+    <span class="pill accent">总管家 · Butler</span>
+    <span class="pill">系统级助理</span>
+    <div class="spacer"></div>
+    <span class="pill" style="background:var(--ava-hover)">空闲 · 执行中 3 会话</span>
+    <button class="ghost-btn" onclick="toggleTheme()">切换主题</button>
+  </header>
+
+  <div class="shell">
+    <!-- 侧栏：nav.sidebar（roster 投影）+ panel.sidebar（注意力设置） -->
+    <aside class="sidebar">
+      <div class="butler-status">
+        <div class="ava">管</div>
+        <div style="flex:1;min-width:0">
+          <div class="who">总管家</div>
+          <div class="state row" style="gap:5px;margin-top:1px"><span class="dotstate busy"></span>思考中 · 委派 2 个任务</div>
+        </div>
+        <span class="pill">晨报</span>
+      </div>
+
+      <div class="section-title">派发会话 · roster</div>
+      <div class="roster">
+        <div class="rrow">
+          <span class="sdot run"></span>
+          <div class="body">
+            <div class="task">整理 Q3 周报 + 修 deprecation 警告</div>
+            <div class="meta">ws: work · 12:40 · 运行中</div>
+          </div>
+          <span class="open">打开</span>
+        </div>
+        <div class="rrow">
+          <span class="sdot run"></span>
+          <div class="body">
+            <div class="task">调研评估体系的三种框架</div>
+            <div class="meta">ws: research · 08:15 · 运行中</div>
+          </div>
+          <span class="open">打开</span>
+        </div>
+        <div class="rrow">
+          <span class="sdot lift"></span>
+          <div class="body">
+            <div class="task">发布 payments-core v0.9</div>
+            <div class="meta">ws: payments · 11:02 · 待你裁决</div>
+          </div>
+          <span class="open">打开</span>
+        </div>
+        <div class="rrow">
+          <span class="sdot done"></span>
+          <div class="body">
+            <div class="task">备份门店销售数据</div>
+            <div class="meta">ws: ops · 昨天 · 完成</div>
+          </div>
+          <span class="open">打开</span>
+        </div>
+      </div>
+
+      <div style="margin-top:auto">
+        <div class="card">
+          <div class="section-title">注意力设置</div>
+          <div class="set-row"><span class="lbl">暂停自治（kill switch）</span><span class="switch" style="margin-top:2px"></span></div>
+          <div class="set-row"><span class="lbl">静默时段</span><span class="muted mono" style="font-size:11px">22:00 – 08:00</span></div>
+          <div class="set-row" style="flex-direction:column;align-items:stretch;gap:6px;padding:8px 0">
+            <span class="lbl">审批纪律档位</span>
+            <div class="seg">
+              <button>仅升级</button>
+              <button class="on">纪律代批</button>
+              <button>宽松代批</button>
+            </div>
+          </div>
+          <p class="muted" style="margin:6px 0 0;font-size:11px">纪律档位 · 低风险代批留痕（who=butler · rule=条款编号），高危一律升级。</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 主区：surface.main = butler（微信式对话流） -->
+    <main class="main">
+      <div class="page-head">
+        <div style="flex:1">
+          <h1>总管家 · 对话流</h1>
+          <p>表达与执行分离 · 你只看到双方发言，管家在后台替你把事做完</p>
+        </div>
+        <span class="pill">butler 常驻会话</span>
+      </div>
+
+      <div class="page-body">
+        <div class="conv">
+          <div class="bub">
+            <div class="pic">管</div>
+            <div class="txt">
+              <div class="who">总管家</div>
+              早上好。昨天派发的 3 个会话已全部开始；「备份门店数据」已结束，摘要：<b>18,420 行已归档</b>，无异常。今天的晨报我放到了最下面，要点是评估体系那篇长文需要你定个方向。
+            </div>
+          </div>
+          <div class="bub me">
+            <div class="pic">我</div>
+            <div class="txt">
+              <div class="who">你</div>
+              整理周报 + 顺手把 payments-core 的 deprecation 警告修了，别改行为。
+            </div>
+          </div>
+          <div class="actionbar">
+            已创建会话 <b>s-a1b2</b> · 「整理周报 + 修 deprecation 警告」→ 派发到 workspace <b>work</b>，按「只修警告、不改行为」约束执行。<br />
+            <span class="act">打开会话</span>
+          </div>
+          <div class="bub me">
+            <div class="pic">我</div>
+            <div class="txt"><div class="who">你</div>发布 payments-core 那个，先别动，等我确认。</div>
+          </div>
+          <div class="escalation">
+            <div class="tagline">▲ L4 升级 · 需要你裁决</div>
+            <h4>会话 s-c3d4 请求执行 cargo publish（发布 payments-core v0.9）</h4>
+            <div class="meta">
+              工具：<span class="mono">cargo publish</span> · 命中高危清单：<b>远端写 / 发布</b>（硬护栏，butler 不可代批）。<br />
+              建议：先在本地跑 <span class="mono">cargo test</span> 全绿后再发布；或改走 CI。
+            </div>
+            <div class="acts">
+              <button class="btn-go">转到会话处理</button>
+              <button class="btn-ghost">稍后再说</button>
+            </div>
+          </div>
+          <div class="bub">
+            <div class="pic">管</div>
+            <div class="txt">
+              <div class="who">总管家</div>
+              收到，发布保持挂起。另外 s-c3d4 里还有一个低风险请求（<span class="mono">cargo build</span>），已按纪律代批：<b>条款 R2（构建/测试）</b>，留痕 who=butler。
+            </div>
+          </div>
+          <div class="morning">
+            <h5>晨报 · 降级项累积（未打扰，等你主动看）</h5>
+            <ul>
+              <li>巡检 4 个工作空间，无新增告警</li>
+              <li>「调研评估体系」已完成 2/3，产出 2 篇摘要已入全局记忆</li>
+              <li>门店分析结论那条「异常尖峰」仍待你定口径</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="inputbar">
+          <span class="at">@ 引用会话</span>
+          <input placeholder="给总管家下达任务……（可 @已有会话继续派活）" />
+          <button class="primary-btn">委派</button>
+        </div>
+      </div>
+
+      <!-- panel.sidebar（跟随主区视图） -->
+      <div class="panel-bottom">
+        <div class="row" style="justify-content:space-between;margin-bottom:var(--ava-sp-2)">
+          <span class="section-title" style="margin:0">信箱 · 事件流水（只读）</span>
+          <span class="tag">未读 2</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="mailitem">
+            <span class="lv L2">L2</span>会话 s-a1b2 完成「修 deprecation 警告」，4 处全部修复
+            <span class="st ok">代批：cargo build · 条款 R2</span>
+          </div>
+          <div class="mailitem">
+            <span class="lv L2">L2</span>会话 s-b2c3 开始执行「调研评估体系」
+            <span class="st">ws: research · 08:15</span>
+          </div>
+          <div class="mailitem">
+            <span class="lv L4">L4</span>会话 s-c3d4 请求发布，已升级通知
+            <span class="st">已通知用户到会话处理 · 未代批</span>
+          </div>
+          <div class="mailitem">
+            <span class="lv L3">L3</span>你离开 40 分钟期间，「备份门店数据」完成
+            <span class="st ok">已代批：数据备份 · 条款 R3</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 画布：surface.canvas = butler-roster（派发看板） + panel.canvas -->
+    <aside class="canvas-side">
+      <div class="canvas-head">
+        <span class="pill active" style="background:var(--ava-nav-active);color:var(--ava-label-primary)">派发看板</span>
+        <span class="pill">全局记忆</span>
+        <div class="spacer"></div>
+        <span class="muted" style="font-size:11px">butler-roster</span>
+      </div>
+      <div class="canvas-body">
+        <div class="board">
+          <div class="brow">
+            <div class="hd"><span class="sdot run" style="width:8px;height:8px;border-radius:50%;background:var(--accent)"></span>整理周报 + 修 deprecation<span class="tag">运行中</span></div>
+            <div class="bar"><i style="width:72%"></i></div>
+            <div class="foot"><span>s-a1b2 · work</span><span>72% · 已修 4/5 处</span></div>
+          </div>
+          <div class="brow">
+            <div class="hd"><span class="sdot run" style="width:8px;height:8px;border-radius:50%;background:var(--accent)"></span>调研评估体系<span class="tag">运行中</span></div>
+            <div class="bar"><i style="width:66%"></i></div>
+            <div class="foot"><span>s-b2c3 · research</span><span>66% · 2/3 摘要</span></div>
+          </div>
+          <div class="brow">
+            <div class="hd"><span class="sdot" style="width:8px;height:8px;border-radius:50%;background:var(--ava-warning)"></span>发布 payments-core<span class="tag" style="color:var(--ava-warning)">等待裁决</span></div>
+            <div class="bar"><i style="width:40%"></i></div>
+            <div class="foot"><span>s-c3d4 · payments</span><span>挂起 · 高危清单</span></div>
+          </div>
+          <div class="brow" style="opacity:.7">
+            <div class="hd"><span class="sdot" style="width:8px;height:8px;border-radius:50%;background:var(--ava-success)"></span>备份门店数据<span class="tag" style="color:var(--ava-success)">完成</span></div>
+            <div class="bar"><i style="width:100%"></i></div>
+            <div class="foot"><span>s-d4e5 · ops</span><span>18,420 行归档</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- panel.canvas：权限与纪律 -->
+      <div class="panel-bottom">
+        <div class="section-title">安全纪律（软约束 + 硬护栏）</div>
+        <div class="card" style="margin:0">
+          <div class="kv"><span>允许代批</span><b>构建 / 测试 / lint / 备份</b></div>
+          <div class="kv"><span>禁止代批</span><b class="mono" style="color:var(--ava-danger)">发布 / 远端写 / 批量删除</b></div>
+          <div class="kv"><span>不确定</span><b>一律升级，不猜测</b></div>
+          <p class="muted" style="margin:8px 0 0;font-size:11px">每笔代批留痕 who=butler · rule=条款编号 · ts；升级走对话流强调卡，butler 不阻塞。</p>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+<script>
+function toggleTheme(){var e=document.documentElement;e.dataset.theme=e.dataset.theme==="dark"?"light":"dark";}
+</script>
+</body>
+</html>

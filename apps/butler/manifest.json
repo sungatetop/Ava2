@@ -1,0 +1,13 @@
+{
+  "id": "butler",
+  "name": "总管家",
+  "version": "0.4.0",
+  "hostApi": 2,
+  "description": "工作台的常驻智能体：一句话委派任务、盯执行进度、把关审批，所有汇报集中在一个对话窗里完成。",
+  "author": "Ava Team",
+  "license": "MIT",
+  "icon": "M12 3a4 4 0 0 1 4 4v1.5a2 2 0 0 1 2 2V21a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V10.5a2 2 0 0 1 2-2V7a4 4 0 0 1 4-4zm2 5.5V7a2 2 0 1 0-4 0v1.5h4z",
+  "inject": ["slots", "agent", "storage", "events"],
+  "surfaces": ["surface.main", "surface.canvas", "nav.sidebar", "panel.sidebar", "panel.canvas", "user.menu"],
+  "entry": "main.js"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "ui-gallery",
+  "name": "弹窗画廊",
+  "version": "0.1.0",
+  "description": "演示同一 App 在五类舞台注入 UI，以及舞台内弹窗控件（模态/抽屉/气泡/Toast/Tooltip/灯箱）的效果。",
+  "hostApi": 2,
+  "kind": "demo",
+  "inject": ["slots"],
+  "surfaces": ["surface.main", "surface.canvas", "nav.sidebar", "panel.sidebar", "panel.canvas"],
+  "contributes": {
+    "apps": [{ "id": "main", "entry": "app.js" }]
+  }
+}

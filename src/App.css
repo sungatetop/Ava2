@@ -1,0 +1,1351 @@
+@import "./styles/tokens.css";
+
+/* 宿主壳样式：对齐原型（app-host-proto）三栏布局。
+   约束：壳只提供布局与中性外观，App 自带业务样式；禁止在此写死业务色值。
+   令牌：全部语义令牌（含间隔/圆角阶梯）定义在 src/styles/tokens.css（--ava-*），
+   此处只 var() 消费；主题由 documentElement 的 data-theme="light|dark" 驱动。 */
+
+/* ── 骨架：标题栏 + 三栏 ── */
+.app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--ava-bg-base);
+}
+
+/* ── 更新横幅（桌面壳发现新版本时由主进程事件触发，占一行、不挤压主区） ── */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-2);
+  flex: none;
+  padding: 6px var(--ava-space-3);
+  background: color-mix(in srgb, var(--ava-state-business-primary) 12%, var(--ava-bg-layer-1));
+  border-bottom: 1px solid color-mix(in srgb, var(--ava-state-business-primary) 28%, transparent);
+  font-size: 13px;
+  color: var(--ava-label-primary);
+}
+
+.update-banner-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-banner-error {
+  color: var(--ava-state-danger);
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-banner-btn {
+  flex: none;
+  height: 26px;
+  padding: 0 var(--ava-space-3);
+  border: none;
+  border-radius: var(--ava-radius-sm);
+  background: var(--ava-state-business-primary);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.update-banner-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.update-banner-close {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--ava-radius-sm);
+  background: transparent;
+  color: var(--ava-label-tertiary);
+  cursor: pointer;
+}
+
+.update-banner-close:hover {
+  background: var(--ava-interactive-bg-hover);
+  color: var(--ava-label-primary);
+}
+
+/* ── 顶部合并条（原 titlebar 36px + tabbar 40px 两行合一 → 单行 40px）：
+      身份区（徽标/名称/状态/折叠钮）｜0.5px 竖分隔｜视图 tab 列表｜spacer｜画布开关 ── */
+.appbar {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-2);
+  height: var(--ava-tabbar-h);
+  padding: 0 var(--ava-space-3);
+  border-bottom: 0.5px solid var(--ava-border-l2);
+  flex: none;
+}
+
+/* 身份区宽度跟随侧栏宽度（--ava-sidebar-w 由行内注入），使分隔线正落在侧栏右缘，
+   tab 列表起点与下方主区列对齐；侧栏拖拽变宽时同步跟随。 */
+.appbar-lead {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-1);
+  width: calc(var(--ava-sidebar-w, 280px) - var(--ava-space-3));
+  flex: none;
+  min-width: 0;
+}
+
+.appbar-id {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-3);
+  margin-right: auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* 侧栏折叠（56px 图标轨）时身份区仅剩徽标 + 折叠钮：收起名称与状态点，去掉多余间隙 */
+.appbar.collapsed .appbar-name,
+.appbar.collapsed .status-dot {
+  display: none;
+}
+
+.appbar.collapsed .appbar-lead {
+  gap: 0;
+}
+
+/* 身份区与 tab 列表的分界：切分「身份」与「视图切换」两类信息，避免连读 */
+.appbar-sep {
+  width: 0.5px;
+  height: 16px;
+  background: var(--ava-border-l3);
+  flex: none;
+}
+
+/* 视图 tab 列表：超出可横向滚动（隐藏滚动条，滚轮纵向手势在 JSX 中映射为横向），
+   单个 tab 不被压缩（flex: 0 0 auto），避免多 App 时互相挤成豆腐块 */
+.appbar-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-0);
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.appbar-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.appbar-badge {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--ava-radius-xs);
+  background: var(--ava-brand);
+  color: var(--ava-bg-base);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.appbar-name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.appbar-spacer {
+  flex: 1;
+}
+
+.shell {
+  display: grid;
+  /* 侧栏宽度由行内样式驱动（280 默认 / 264–420 拖拽 / 56 折叠），轨道随内容收缩 */
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── 侧边栏（底色 + 半像素右边线 + 8/10 内边距，导航项 32px/圆角 12；
+      宽度 264–420 拖拽调宽，可折叠 56px 图标-only） ── */
+.sidebar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ava-space-1);
+  padding: var(--ava-space-2) var(--ava-space-3);
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--ava-bg-sidebar);
+  border-right: 0.5px solid var(--ava-border-l3);
+  flex: none;
+  transition: width 0.15s ease;
+}
+
+body.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.sidebar-resize {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+}
+
+.sidebar-resize:hover {
+  background: var(--ava-state-business-primary);
+  opacity: 0.35;
+}
+
+/* 折叠态：图标-only（56px），文字与面板隐藏 */
+.sidebar.collapsed .nav-link {
+  justify-content: center;
+  padding: 0;
+}
+
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .side-panels,
+.sidebar.collapsed .empty-inline {
+  display: none;
+}
+
+.side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ava-space-0);
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-3);
+  height: 32px;
+  padding: 0 var(--ava-space-2);
+  border: none;
+  border-radius: var(--ava-radius-md);
+  background: transparent;
+  color: var(--ava-label-secondary);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  background: var(--ava-interactive-bg-hover);
+  color: var(--ava-label-primary);
+}
+
+.nav-link.on {
+  background: var(--ava-nav-active);
+  color: var(--ava-label-primary);
+  font-weight: 500;
+}
+
+.nav-ico {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.nav-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ava-label-tertiary);
+}
+
+.nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-panels {
+  /* 面板撑满导航以下剩余高度，内部列表自滚（侧栏本身不再整体滚动） */
+  display: flex;
+  flex-direction: column;
+  gap: var(--ava-space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.empty-inline {
+  padding: var(--ava-space-2);
+  font-size: 12px;
+  color: var(--ava-label-tertiary);
+}
+
+/* ── user 栏（侧边栏底部宿主身份区）+ 上浮菜单 ── */
+.user-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-2);
+  height: 44px;
+  flex: none;
+  padding: 0 var(--ava-space-2);
+  border: none;
+  border-radius: var(--ava-radius-md);
+  background: transparent;
+  color: var(--ava-label-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-bar:hover,
+.user-bar.on {
+  background: var(--ava-interactive-bg-hover);
+}
+
+.user-bar-avatar,
+.user-pop-avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ava-state-business-primary, #4176e6);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.user-bar-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  flex: 1;
+}
+
+.user-bar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 18px;
+}
+
+.user-bar-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--ava-label-tertiary);
+}
+
+/* 折叠态：只显示头像，文字与箭头隐藏、按钮居中（AppIconView 渲染裸 svg） */
+.sidebar.collapsed .user-bar {
+  justify-content: center;
+  padding: 0;
+}
+
+.sidebar.collapsed .user-bar-text,
+.sidebar.collapsed .user-bar > svg {
+  display: none;
+}
+
+/* 上浮菜单：fixed 定位（sidebar overflow-y 会裁切 absolute 子元素），向上展开 */
+.user-pop {
+  position: fixed;
+  z-index: 30;
+  width: min(248px, calc(100vw - 24px));
+  padding: 6px;
+  border: 0.5px solid var(--ava-border-l2);
+  border-radius: var(--ava-radius-md);
+  background: var(--ava-bg-layer-1);
+  box-shadow: var(--ava-shadow-panel);
+  animation: user-pop-in 0.12s ease;
+}
+
+@keyframes user-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.user-pop-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-3);
+  padding: var(--ava-space-2);
+}
+
+.user-pop-meta {
+  min-width: 0;
+}
+
+.user-pop-name {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--ava-label-primary);
+}
+
+.user-pop-sub {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--ava-label-tertiary);
+}
+
+.user-pop-divider {
+  height: 0.5px;
+  margin: 4px 2px;
+  background: var(--ava-border-l1);
+}
+
+.user-pop-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-3);
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--ava-space-2);
+  border: none;
+  border-radius: var(--ava-radius-sm);
+  background: transparent;
+  color: var(--ava-label-secondary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-pop-item:hover {
+  background: var(--ava-interactive-bg-hover);
+  color: var(--ava-label-primary);
+}
+
+.user-pop-ico {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.user-pop-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ava-label-tertiary);
+}
+
+.user-pop-group-title {
+  padding: var(--ava-space-2) var(--ava-space-2) 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.035em;
+  color: var(--ava-label-tertiary);
+}
+
+/* ── 主区：舞台（tab 列表已上移至 .appbar） ── */
+.main-area {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tabbar-empty {
+  padding: 0 var(--ava-space-2);
+  font-size: 12px;
+  color: var(--ava-label-tertiary);
+}
+
+.tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-2);
+  height: 28px;
+  padding: 0 var(--ava-space-2) 0 var(--ava-space-3);
+  border-radius: var(--ava-radius-sm);
+  color: var(--ava-label-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  flex: 0 0 auto;
+}
+
+/* tab 标题：超长省略，保证多 tab 滚动时宽度稳定 */
+.tab-title {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  background: var(--ava-interactive-bg-hover);
+}
+
+.tab.on {
+  position: relative;
+  background: var(--ava-nav-active);
+  color: var(--ava-label-primary);
+  font-weight: 500;
+}
+
+/* 选中 tab：底部短下划线（强调色），与 hover 灰底拉开区分 */
+.tab.on::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 16px;
+  height: 2px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  background: var(--ava-state-business-primary);
+}
+
+.tab-close {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: var(--ava-radius-xs);
+  background: transparent;
+  color: var(--ava-label-tertiary);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tab-close:hover {
+  background: var(--ava-interactive-bg-hover);
+  color: var(--ava-label-primary);
+}
+
+.stage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.pane {
+  padding: var(--ava-space-4);
+}
+
+/* ── 画布第二舞台（原型 canvas-side：折叠仅收宽度，视图状态驻留） ── */
+.canvas-side {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--ava-bg-layer-1);
+  transition: width 0.18s ease;
+}
+
+.canvas-side.open {
+  border-left: 0.5px solid var(--ava-border-l2);
+}
+
+/* 画布左缘拖拽手柄（展开时显示，col-resize） */
+.canvas-resizer {
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 5;
+}
+
+.canvas-resizer:hover {
+  background: var(--ava-state-business-primary);
+  opacity: 0.4;
+}
+
+.canvas-head {
+  display: flex;
+  align-items: center;
+  height: var(--ava-tabbar-h);
+  padding: 0 var(--ava-space-2);
+  border-bottom: 0.5px solid var(--ava-border-l2);
+  flex: none;
+}
+
+.canvas-tabbar {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-0);
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+/* 文件树开关固定在画布 tab 栏最右侧（不随 tab 滚动溢出） */
+.canvas-tree-toggle {
+  flex: none;
+  margin-left: auto;
+}
+
+.canvas-stage {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--ava-space-3);
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: var(--ava-space-3);
+}
+
+/* 画布主视图（左列，自适应剩余宽度） */
+.canvas-surface {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* 画布面板列（右列，如 file-explorer 文件树）：固定宽度、独立滚动，竖排堆叠。
+   支持独立折叠：收成 24px 窄条（仅展开按钮），展开恢复列内容。 */
+.canvas-panels {
+  flex: none;
+  width: 300px;
+  min-height: 0;
+  overflow: hidden;
+  border-left: 0.5px solid var(--ava-border-l2);
+  padding-left: var(--ava-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ava-space-2);
+  transition: width 0.15s ease;
+}
+
+.canvas-panels:empty {
+  display: none;
+}
+
+/* 画布启动器（canvas:home）：桌面启动器形态——72px 大图标网格 */
+.launcher-head {
+  margin: var(--ava-space-1) 0 var(--ava-space-3);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ava-label-secondary);
+}
+
+.launch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: var(--ava-space-5) var(--ava-space-4);
+}
+
+.launch-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ava-space-2);
+  padding: var(--ava-space-4);
+  border: none;
+  border-radius: var(--ava-radius-lg);
+  background: transparent;
+  color: var(--ava-label-primary);
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.18s;
+}
+
+.launch-tile:hover {
+  background: var(--ava-interactive-bg-hover);
+  transform: translateY(-2px);
+}
+
+.launch-tile .tile-icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--ava-radius-xl);
+  background: linear-gradient(135deg, var(--ava-interactive-bg-hover), var(--ava-nav-active));
+  color: var(--ava-state-business-primary);
+  box-shadow: var(--ava-shadow-elevated);
+}
+
+.launch-tile .tile-name {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 通用控件 ── */
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--ava-radius-xs);
+  background: transparent;
+  color: var(--ava-label-secondary);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--ava-interactive-bg-hover);
+  color: var(--ava-label-primary);
+}
+
+.icon-btn.on {
+  background: var(--ava-nav-active);
+  color: var(--ava-label-primary);
+}
+
+button {
+  font: inherit;
+  font-size: 13px;
+  padding: var(--ava-space-1) var(--ava-space-3);
+  border: 0.5px solid var(--ava-border-l2);
+  border-radius: var(--ava-radius-sm);
+  background: var(--ava-bg-layer-1);
+  color: var(--ava-label-primary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+button:hover {
+  border-color: var(--ava-label-tertiary);
+}
+
+/* 键盘焦点可见性（Tab 导航）：强调色 2px 外圈，鼠标点击不触发 */
+:focus-visible {
+  outline: 2px solid var(--ava-state-business-primary);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── 文本与状态 ── */
+.dim {
+  color: var(--ava-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.empty {
+  padding: var(--ava-space-5) var(--ava-space-2);
+  color: var(--ava-label-tertiary);
+  font-size: 13px;
+}
+
+.fail {
+  color: var(--ava-state-danger);
+  font-size: 12px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ava-label-tertiary);
+  flex: none;
+}
+
+.status-dot.ok {
+  background: var(--ava-state-success);
+}
+
+.status-dot.bad {
+  background: var(--ava-state-danger);
+}
+
+.tag {
+  padding: 0 var(--ava-space-2);
+  border: 0.5px solid var(--ava-border-l2);
+  border-radius: var(--ava-radius-pill);
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--ava-label-tertiary);
+}
+
+.tag.active {
+  color: var(--ava-state-success);
+  border-color: var(--ava-state-success);
+}
+
+.tag.failed {
+  color: var(--ava-state-danger);
+  border-color: var(--ava-state-danger);
+}
+
+/* ── 应用市场（App 管理） ── */
+.app-store {
+  padding: var(--ava-space-4);
+}
+
+.store-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-4);
+  margin-bottom: var(--ava-space-4);
+}
+
+.store-head h1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  margin: 0;
+}
+
+.store-search {
+  position: relative;
+  margin-left: auto;
+  width: 240px;
+}
+
+.store-search svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ava-label-tertiary);
+}
+
+.store-search input {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px 0 32px;
+  border: 0.5px solid var(--ava-border-l2);
+  border-radius: var(--ava-radius-pill);
+  background: var(--ava-bg-layer-2);
+  color: var(--ava-label-primary);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.store-search input:focus {
+  border-color: var(--ava-state-business-primary);
+}
+
+.store-install-btn {
+  flex: none;
+  height: 34px;
+  padding: 0 16px;
+  border: 0.5px solid var(--ava-border-l2);
+  border-radius: var(--ava-radius-pill);
+  background: var(--ava-bg-layer-2);
+  color: var(--ava-label-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.store-install-btn:hover {
+  background: var(--ava-interactive-bg-hover);
+  color: var(--ava-label-primary);
+}
+
+.store-install {
+  display: flex;
+  gap: var(--ava-space-2);
+  margin-bottom: var(--ava-space-4);
+  padding: var(--ava-space-3);
+  border: 0.5px solid var(--ava-border-l2);
+  border-radius: var(--ava-radius-md);
+  background: var(--ava-bg-layer-1);
+}
+
+.store-install input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--ava-space-1) var(--ava-space-3);
+  border: 0.5px solid var(--ava-border-l2);
+  border-radius: var(--ava-radius-sm);
+  background: var(--ava-bg-base);
+  color: var(--ava-label-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+/* 图标网格 */
+.app-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  gap: var(--ava-space-5) var(--ava-space-3);
+}
+
+.app-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ava-space-2);
+  padding: var(--ava-space-3);
+  border: none;
+  border-radius: var(--ava-radius-lg);
+  background: transparent;
+  color: var(--ava-label-primary);
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.app-tile:hover {
+  background: var(--ava-interactive-bg-hover);
+}
+
+.app-tile .tile-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--ava-radius-xl);
+  background: var(--ava-interactive-bg-hover);
+  color: var(--ava-label-secondary);
+  box-shadow: var(--ava-shadow-elevated);
+}
+
+.app-tile .tile-name {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 状态点：active 绿点，其余灰点 */
+.tile-dot {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ava-state-success);
+  border: 2px solid var(--ava-bg-layer-1);
+}
+
+.tile-dot.off {
+  background: var(--ava-label-tertiary);
+}
+
+/* 禁用：灰度 + 弱化 */
+.app-tile.off .tile-icon {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.app-tile.off .tile-name {
+  color: var(--ava-label-tertiary);
+}
+
+.app-tile-placeholder {
+  font-size: 22px;
+  opacity: 0.6;
+}
+
+/* ── 详情弹窗（居中 modal） ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-modal {
+  width: min(420px, calc(100vw - 48px));
+  background: var(--ava-bg-layer-2);
+  border: 0.5px solid var(--ava-border-l2);
+  border-radius: var(--ava-radius-lg);
+  box-shadow: var(--ava-shadow-panel);
+  animation: modal-in 0.18s ease;
+}
+
+@keyframes modal-in {
+  from {
+    transform: scale(0.96) translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* 卸载确认（AlertDialog：不可逆操作对话框确认） */
+.confirm-modal {
+  width: min(360px, calc(100vw - 48px));
+  padding: var(--ava-space-5);
+  background: var(--ava-bg-layer-2);
+  border: 0.5px solid var(--ava-border-l2);
+  border-radius: var(--ava-radius-lg);
+  box-shadow: var(--ava-shadow-panel);
+  animation: modal-in 0.18s ease;
+}
+
+.confirm-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ava-label-primary);
+}
+
+.confirm-desc {
+  margin-top: var(--ava-space-2);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ava-label-secondary);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ava-space-2);
+  margin-top: var(--ava-space-4);
+}
+
+.drawer-body {
+  padding: var(--ava-space-5);
+}
+
+.drawer-app {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-4);
+}
+
+.drawer-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--ava-radius-xl);
+  background: var(--ava-interactive-bg-hover);
+  color: var(--ava-label-secondary);
+}
+
+.drawer-name {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.drawer-desc {
+  margin-top: var(--ava-space-1);
+  color: var(--ava-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.drawer-divider {
+  height: 0.5px;
+  background: var(--ava-border-l2);
+  margin: var(--ava-space-4) 0;
+}
+
+.drawer-row {
+  display: flex;
+  align-items: center;
+}
+
+.drawer-lbl {
+  color: var(--ava-label-secondary);
+  font-size: 13px;
+}
+
+.drawer-row .spacer {
+  flex: 1;
+}
+
+.drawer-switch {
+  position: relative;
+  width: 40px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--ava-radius-pill);
+  background: var(--ava-border-l2);
+  transition: background 0.2s;
+}
+
+.drawer-switch::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.2s;
+}
+
+.drawer-switch.on {
+  background: var(--ava-state-success);
+}
+
+.drawer-switch.on::after {
+  left: 19px;
+}
+
+.drawer-switch:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.drawer-actions {
+  display: flex;
+  gap: var(--ava-space-2);
+  padding-top: var(--ava-space-4);
+}
+
+.btn-solid,
+.btn-ghost,
+.btn-danger {
+  flex: 1;
+  height: 38px;
+  border-radius: var(--ava-radius-pill);
+  font-size: 13px;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.btn-solid {
+  border: none;
+  background: var(--ava-state-business-primary);
+  color: #fff;
+}
+
+.btn-solid:hover {
+  background: var(--ava-state-business-primary-hover);
+}
+
+.btn-ghost {
+  border: 0.5px solid var(--ava-border-l2);
+  background: transparent;
+  color: var(--ava-label-secondary);
+}
+
+.btn-ghost:hover {
+  background: var(--ava-interactive-bg-hover);
+  color: var(--ava-label-primary);
+}
+
+/* 危险按钮：常态弱化为 secondary，hover 才转 danger——红只在不可逆操作瞬间出现 */
+.btn-danger {
+  border: 0.5px solid var(--ava-border-l2);
+  background: transparent;
+  color: var(--ava-label-secondary);
+}
+
+.btn-danger:hover {
+  border-color: var(--ava-state-danger);
+  background: rgba(236, 19, 19, 0.08);
+  color: var(--ava-state-danger);
+}
+
+code {
+  color: var(--ava-label-tertiary);
+  font-family: var(--ava-font-mono);
+  font-size: 11px;
+}
+
+/* ── 滚动条皮肤 ──
+   5px 细条、轨道透明、thumb 全圆角 + 令牌色（hover 加深）。
+   WebKit 引擎走伪元素路径；Firefox（无该伪元素）走 scrollbar-width/color 标准路径，
+   二者互斥，由 @supports 门控（非 auto 的标准属性会让 WebKit 丢弃伪元素规则）。 */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: var(--ava-radius-pill);
+  background: var(--ava-scrollbar-thumb);
+}
+
+@media (hover: hover) {
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ava-scrollbar-thumb-hover);
+  }
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  body,
+  body * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--ava-scrollbar-thumb) transparent;
+  }
+}
+
+/* ============ 浮层舞台（App 舞台悬浮于主界面之上） ============ */
+
+/* tab 上的悬浮按钮：绝对定位进 tab 右内隙（关闭钮左侧），常态不占宽度，
+   hover 或已悬浮时淡入；隐藏时 pointer-events 关闭，避免抢 title 的点击 */
+.tab-float {
+  position: absolute;
+  top: 50%;
+  right: calc(var(--ava-space-2) + 16px + var(--ava-space-2));
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: var(--ava-radius-xs);
+  background: transparent;
+  color: var(--ava-label-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.tab:hover .tab-float,
+.tab-float.on {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tab-float:hover {
+  background: var(--ava-interactive-bg-hover);
+  color: var(--ava-label-primary);
+}
+
+.tab-float.on {
+  color: var(--ava-state-business-primary);
+}
+
+/* 悬浮窗：fixed 卡片、无遮罩（主界面仍可操作）；层级高于舞台内容（10）、低于宿主模态（40） */
+.stage-overlay {
+  position: fixed;
+  z-index: 20;
+  width: min(640px, 72vw);
+  height: min(560px, 66vh);
+  display: flex;
+  flex-direction: column;
+  background: var(--ava-bg-base);
+  border: 0.5px solid var(--ava-border-l2);
+  border-radius: var(--ava-radius-lg);
+  box-shadow: var(--ava-shadow-elevated);
+  overflow: hidden;
+}
+
+/* 标题栏即拖动手柄（按钮除外） */
+.stage-overlay-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-2);
+  height: 32px;
+  flex: none;
+  padding: 0 var(--ava-space-2) 0 var(--ava-space-3);
+  border-bottom: 0.5px solid var(--ava-border-l2);
+  background: var(--ava-bg-sidebar);
+  color: var(--ava-label-tertiary);
+  cursor: grab;
+  user-select: none;
+  /* Pointer Events 拖动：禁用触控默认手势，保证 pointermove 连续派发 */
+  touch-action: none;
+}
+
+.stage-overlay-head:active {
+  cursor: grabbing;
+}
+
+.stage-overlay-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ava-label-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stage-overlay-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* 右下角缩放手柄：斜纹 grip，hover 高亮（同 canvas-resizer 强调色手法） */
+.stage-overlay-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.stage-overlay-resize::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  background: linear-gradient(
+    135deg,
+    transparent 0 50%,
+    var(--ava-border-l2) 50% 55%,
+    transparent 55% 70%,
+    var(--ava-border-l2) 70% 75%,
+    transparent 75% 90%,
+    var(--ava-border-l2) 90% 95%,
+    transparent 95%
+  );
+  border-radius: 0 0 var(--ava-radius-lg) 0;
+}
+
+.stage-overlay-resize:hover::before {
+  background: linear-gradient(
+    135deg,
+    transparent 0 50%,
+    var(--ava-state-business-primary) 50% 55%,
+    transparent 55% 70%,
+    var(--ava-state-business-primary) 70% 75%,
+    transparent 75% 90%,
+    var(--ava-state-business-primary) 90% 95%,
+    transparent 95%
+  );
+}

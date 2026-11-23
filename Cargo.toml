@@ -1,0 +1,111 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/onion",
+    "crates/onion-jobs",
+    "crates/onion-cli",
+    "crates/onion-tui",
+    "crates/onion-sandbox",
+    "crates/onion-sdk-server",
+    "crates/onion-sdk-client",
+    "crates/onion-server",
+]
+# src-tauri 是独立 Tauri 工程（自带前端 + 独立 Cargo.lock），不并入本 workspace；
+# 它通过 runtime spawn 使用 onion-server 边车，二者仅在进程边界互连。
+exclude = ["src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+# 代码风格约定统一在此集中配置为 deny，由 CI/本地 clippy 强制，而非仅靠自觉。
+[workspace.lints]
+rust = {}
+
+[workspace.lints.clippy]
+await_holding_invalid_type = "deny"
+await_holding_lock = "deny"
+collapsible_if = "deny"
+disallowed_methods = "deny"
+expect_used = "deny"
+identity_op = "deny"
+manual_clamp = "deny"
+manual_filter = "deny"
+manual_find = "deny"
+manual_flatten = "deny"
+manual_map = "deny"
+manual_memcpy = "deny"
+manual_non_exhaustive = "deny"
+manual_ok_or = "deny"
+manual_range_contains = "deny"
+manual_retain = "deny"
+manual_strip = "deny"
+manual_try_fold = "deny"
+manual_unwrap_or = "deny"
+needless_borrow = "deny"
+needless_borrowed_reference = "deny"
+needless_collect = "deny"
+needless_late_init = "deny"
+needless_option_as_deref = "deny"
+needless_question_mark = "deny"
+needless_update = "deny"
+redundant_clone = "deny"
+redundant_closure = "deny"
+redundant_closure_for_method_calls = "deny"
+redundant_static_lifetimes = "deny"
+trivially_copy_pass_by_ref = "deny"
+uninlined_format_args = "deny"
+unnecessary_filter_map = "deny"
+unnecessary_lazy_evaluations = "deny"
+unnecessary_sort_by = "deny"
+unnecessary_to_owned = "deny"
+unwrap_used = "deny"
+
+[workspace.dependencies]
+crossterm = { version = "0.28", default-features = false, features = ["events", "windows", "libc", "bracketed-paste"] }
+serde = { version = "1", features = ["derive"] }
+portable-pty = "0.9"
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Console",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }
+serde_json = "1"
+serde_yaml = "0.9"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "multipart"] }
+bytes = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "io-util", "process", "fs"] }
+thiserror = "1"
+futures-util = "0.3"
+clap = { version = "4", features = ["derive"] }
+axum = { version = "0.8", features = ["ws"] }
+tower-http = { version = "0.6", features = ["cors"] }
+http = "1"
+uuid = { version = "1", features = ["v4", "v7"] }
+tracing = "0.1"
+# 会话写租约（unix 分支 flock，onion::session_lock）。
+libc = "0.2"
+regex = "1"
+sha2 = "0.10"
+tokio-util = "0.7"
+# zip 解包（onion-server skill-hub 安装面：SkillHub 社区 zip → .onion/skills）。
+zip = { version = "2", default-features = false, features = ["deflate"] }
+# 运行期可切换引用（onion model_target）。
+arc-swap = "1"
+base64 = "0.22"
+# 图像上下文预算（onion media 模块）：进模图片解码/降采样/重编码。
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+# TLS 必开：0.29 与 axum ws 依赖同代（0.23 的 rustls 握手路径存在挂起问题）。
+tokio-tungstenite = { version = "0.29", features = ["rustls-tls-native-roots"] }
+# MCP (Model Context Protocol) 客户端 SDK（onion mcp_resources 模块）。
+rmcp = { version = "3.1", default-features = false, features = [
+    "client",
+    "transport-child-process",
+    "transport-streamable-http-client-reqwest",
+] }

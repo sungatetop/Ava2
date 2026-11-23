@@ -1,0 +1,13 @@
+{
+  "id": "morningside",
+  "name": "晨间简报",
+  "version": "0.1.0",
+  "hostApi": 2,
+  "description": "打开工作台的第一屏：今日待办、待回填审批、需要你决策的问题与目标进度，由你的会话与待办实时汇总而成。",
+  "author": "Ava Team",
+  "license": "MIT",
+  "icon": "M12 2a1 1 0 0 1 1 1v1.05a8 8 0 1 1-2 0V3a1 1 0 0 1 1-1zM5.64 5.64a1 1 0 0 1 1.42 0l.7.7a1 1 0 0 1-1.42 1.42l-.7-.7a1 1 0 0 1 0-1.42zM3 12a1 1 0 0 1 1-1h1a1 1 0 0 1 0 2H4a1 1 0 0 1-1-1zm17-1a1 1 0 0 1 1 1 1 1 0 0 1-1 1h-1a1 1 0 0 1 0-2h1zM5 16a1 1 0 0 1 1 1v2h12v-2a1 1 0 0 1 2 0v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z",
+  "inject": ["slots", "agent", "storage"],
+  "surfaces": ["surface.main", "surface.canvas", "nav.sidebar", "panel.sidebar"],
+  "entry": "main.js"
+}

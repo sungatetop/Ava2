@@ -1,0 +1,364 @@
+{
+  "specVersion": "1.0.0",
+  "title": "ava2 App 契约（hostApi 2）",
+  "description": "机器可读的 App 契约。唯一权威的类型定义在 src/host/types.ts；叙述版见 docs/references/app-dev-guide.md；本文件用 scripts/check-app-contract.mjs 与两者交叉校验，任一处漂移都会校验失败。",
+  "types": "src/host/types.ts",
+  "guide": "docs/references/app-dev-guide.md",
+  "hostApi": {
+    "supported": 2,
+    "legacyFullInjectBelow": 1,
+    "note": "0 = 旧契约全量注入；>=1 按 manifest.inject 收窄；>=2 支持 contributes 能力贡献。新 App 一律写 2。"
+  },
+  "manifest": {
+    "required": ["id", "name", "version", "hostApi"],
+    "entryRule": "顶层 entry 与 contributes.apps[].entry 至少声明一个；每个入口都必须是 App 根目录内的相对路径且文件真实存在（边车安装期即校验，缺失返回 app_entry_not_found）。",
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "authored": true,
+        "pattern": "^[A-Za-z0-9._-]{1,64}$",
+        "description": "全局唯一标识；安装目录名与登记键，必须与 apps/<id>/ 目录名一致。"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "required": true,
+        "authored": true,
+        "minLength": 1,
+        "description": "展示名。"
+      },
+      {
+        "name": "version",
+        "type": "string",
+        "required": true,
+        "authored": true,
+        "description": "版本号；同时作为 ESM URL 缓存指纹 ?v=，改代码必须 bump。"
+      },
+      {
+        "name": "description",
+        "type": "string",
+        "required": false,
+        "authored": true,
+        "description": "一句话简介：应用市场网格与详情抽屉展示；缺省隐藏简介行。"
+      },
+      {
+        "name": "author",
+        "type": "string",
+        "required": false,
+        "authored": true,
+        "minLength": 1,
+        "description": "开发者/团队展示名：详情面板「开发者：xxx」展示；缺省不渲染。"
+      },
+      {
+        "name": "homepage",
+        "type": "string",
+        "required": false,
+        "authored": true,
+        "description": "主页/仓库 URL：详情面板可点击链接（仅 http(s):// 前缀渲染为链接，其余按纯文本防注入）；缺省不渲染。"
+      },
+      {
+        "name": "license",
+        "type": "string",
+        "required": false,
+        "authored": true,
+        "minLength": 1,
+        "description": "开源协议：推荐 SPDX 标识符（如 MIT / Apache-2.0），详情面板「协议：xxx」展示；缺省不渲染。"
+      },
+      {
+        "name": "icon",
+        "type": "AppIcon",
+        "required": false,
+        "authored": true,
+        "description": "应用展示图标（AppIcon：24×24 SVG path 字符串或 { d, fill }，约束见 docs/references/icon-spec.md）：应用形象权威声明，安装期静态可得；slot 内 icon 为局部导航/面板场景，未声明时宿主回落 slot 遍历。"
+      },
+      {
+        "name": "entry",
+        "type": "string",
+        "required": false,
+        "authored": true,
+        "description": "顶层 ESM 入口（兼容位）。声明 contributes.apps 时可省略；未声明 apps 时它即唯一主页（pageId 为 \".\"）。"
+      },
+      {
+        "name": "hostApi",
+        "type": "integer",
+        "required": true,
+        "authored": true,
+        "minimum": 0,
+        "maximum": 2,
+        "description": "宿主契约版本；超过 supported 时安装被拒（app_host_api_unsupported）。"
+      },
+      {
+        "name": "inject",
+        "type": "string[]",
+        "required": false,
+        "authored": true,
+        "enum": "inject",
+        "description": "声明要用的能力面；hostApi>=1 时访问未声明的面即响亮报错。"
+      },
+      {
+        "name": "net",
+        "type": "NetAuth",
+        "required": false,
+        "authored": true,
+        "description": "联网服务授权（inject 含 \"net\" 生效）：App 级域白名单（裸域名，host 等于域或为域子域）；缺省 = 全部 https 公网。"
+      },
+      {
+        "name": "surfaces",
+        "type": "string[]",
+        "required": false,
+        "authored": true,
+        "enum": "slotKeys",
+        "description": "声明可注入的 slot key；越权注入加载期报错。"
+      },
+      {
+        "name": "kind",
+        "type": "string",
+        "required": false,
+        "authored": true,
+        "enum": "kind",
+        "description": "preset（缺省）/ demo（画布启动器排在预置之后）。"
+      },
+      {
+        "name": "permissions",
+        "type": "string[]",
+        "required": false,
+        "authored": true,
+        "description": "预留字段，宿主当前不消费。"
+      },
+      {
+        "name": "contributes",
+        "type": "AppContributes",
+        "required": false,
+        "authored": true,
+        "description": "能力贡献声明（hostApi>=2）：apps / skills / mcpServers / hooks / agents 五类彼此独立可组合。"
+      },
+      {
+        "name": "baseUrl",
+        "type": "string",
+        "required": false,
+        "authored": false,
+        "description": "宿主注入：产物根 URL，相对路径解析基准。App 不得自行填写。"
+      },
+      {
+        "name": "enabled",
+        "type": "boolean",
+        "required": false,
+        "authored": false,
+        "description": "宿主注入：安装登记表中的启停态，由 /v1/apps 下发。"
+      }
+    ]
+  },
+  "enums": {
+    "inject": ["slots", "events", "agent", "storage", "net"],
+    "slotKeys": ["surface.main", "surface.canvas", "nav.sidebar", "panel.sidebar", "panel.canvas", "user.menu"],
+    "hookEvents": [
+      "PreToolUse",
+      "PostToolUse",
+      "PostToolUseFailure",
+      "UserPromptSubmit",
+      "SessionStart",
+      "SessionEnd",
+      "Stop",
+      "SubagentStart",
+      "SubagentStop",
+      "PreCompact",
+      "PostCompact",
+      "Notification"
+    ],
+    "kind": ["preset", "demo"]
+  },
+  "slots": [
+    {
+      "key": "surface.main",
+      "kind": "claiming",
+      "required": ["viewId", "title", "component"],
+      "description": "主区 tab 舞台；viewId 是路由键，全局唯一，冲突加载期报错。"
+    },
+    {
+      "key": "surface.canvas",
+      "kind": "claiming",
+      "required": ["viewId", "title", "component"],
+      "optional": ["icon", "description"],
+      "description": "画布第二舞台；viewId 全局唯一；icon 为 AppIcon（string 或 {d, fill}，见 docs/references/icon-spec.md）。"
+    },
+    {
+      "key": "nav.sidebar",
+      "kind": "reference",
+      "required": ["order", "viewId", "title"],
+      "optional": ["icon"],
+      "description": "左侧导航（32px 行，18px 图标），按 order 升序；viewId 引用本 App 的主区视图；icon 为 AppIcon（见 docs/references/icon-spec.md）。"
+    },
+    {
+      "key": "panel.sidebar",
+      "kind": "reference",
+      "required": ["order", "viewId", "title", "component"],
+      "description": "侧栏下方面板区，按 viewId 跟随主区视图过滤后按 order 排序。"
+    },
+    {
+      "key": "panel.canvas",
+      "kind": "reference",
+      "required": ["order", "viewId", "title", "component"],
+      "optional": ["icon"],
+      "description": "画布面板列（右侧，如文件树），按 viewId 跟随画布视图过滤后按 order 排序；icon 为 AppIcon（应用市场展示用，见 docs/references/icon-spec.md）。"
+    },
+    {
+      "key": "user.menu",
+      "kind": "reference",
+      "required": ["id", "title"],
+      "optional": ["icon", "order", "action"],
+      "description": "侧边栏 user 栏上浮菜单的 App 区菜单项（按 App 名分组、组内 order 排序）；action 为纯数据动作（openView/openSettings/event），宿主解释执行。"
+    }
+  ],
+  "ctx": {
+    "surfaces": ["manifest", "pageId", "slots", "events", "agent", "net", "storage", "registerSettingsPanel"],
+    "net": {
+      "endpoint": "POST /v1/net/fetch",
+      "request": "{ url, method?: \"GET\"|\"POST\", headers?, body?, encoding?: \"text\"|\"dataUrl\" }",
+      "result": "{ status, contentType, body }",
+      "rules": [
+        "外联唯一出口：App 不得自行 fetch 第三方站点（浏览器 CORS 白名单不可控）。",
+        "授权：manifest inject 声明 \"net\"；可选 net.allow 域白名单（缺省 = 全部 https 公网）。",
+        "安全底线（服务端）：仅 https 公网（拒绝 localhost/私网/环回/链路本地/无点主机名）、重定向逐跳复检、方法仅 GET/POST、请求头白名单（accept/authorization/content-type/user-agent）、响应 ≤4MiB、超时 15s、上游状态码透传。",
+        "越权 fail-loud：未声明能力面或域不在白名单时宿主直接抛错。"
+      ]
+    },
+    "notes": [
+      "setup(ctx) 是 App 唯一入口 API；组件拿不到 ctx，需在 setup 内用闭包捕获。",
+      "component 一律是 async () => ({ default: Comp }) 惰性工厂，setup 只登记不做副作用。",
+      "storage 命名空间为 app:<id>:，契约统一异步。",
+      "registerSettingsPanel 登记本 App 的设置面板（纯声明）：应用市场详情页出现「设置」入口；表单/存储/校验由 App 自理。"
+    ]
+  },
+  "agentChannel": {
+    "methods": [
+      "onSessionEvent",
+      "listSessions",
+      "listDirs",
+      "getSession",
+      "createSession",
+      "deleteSession",
+      "getMessages",
+      "readWorkspaceFile",
+      "send",
+      "listModels",
+      "addModel",
+      "removeModel",
+      "setDefaultModel",
+      "addProvider",
+      "removeProvider",
+      "testModel",
+      "listTasks",
+      "createTask",
+      "toggleTask",
+      "updateTask",
+      "deleteTask",
+      "runTask",
+      "setSessionModel",
+      "setApprovalPreset",
+      "listAgents",
+      "interrupt",
+      "runCommand",
+      "compact",
+      "getPending",
+      "replyApproval",
+      "replyPlanReview",
+      "answerQuestion",
+      "getTodos",
+      "getGoal",
+      "setGoal",
+      "goalAction",
+      "getPlan",
+      "setPlan",
+      "listSkills",
+      "getSkillManager",
+      "putSkillManager",
+      "installSkillHub"
+    ],
+    "notes": [
+      "App 不直连 WS，一律经 ctx.agent（每会话一条 WS 多路复用，引用归零即关闭）。",
+      "onSessionEvent 首个 snapshot 帧既是全量历史也是连接就绪信号。",
+      "createSession(cwd) 即工作区切换：权限根在会话创建期固定，跨工作区 = 新会话。"
+    ]
+  },
+  "events": [
+    { "type": "canvas.open", "payload": "{ viewId }", "description": "请求壳打开画布 tab（折叠中自动展开）。" },
+    { "type": "canvas.openPath", "payload": "{ path }", "description": "请求壳打开工作区目录。" },
+    { "type": "agent.invoke", "payload": "任意", "description": "App → Agent 协作请求。" },
+    { "type": "agent.reply", "payload": "任意", "description": "Agent → App 协作回执。" },
+    { "type": "agent.hookResult", "payload": "任意", "description": "仅回宿主的回执类事件，不进其他 App。" }
+  ],
+  "contributes": {
+    "categories": {
+      "apps": {
+        "assembledBy": "前端宿主（src/host/registry.ts 的 resolvePages）",
+        "shape": "AppPageDecl[]：{ id, entry, hostApi?, inject?, surfaces?, config? }",
+        "rules": [
+          "页 id 在 App 内唯一；entry 为 App 根目录内相对路径。",
+          "contributes.apps 非空时逐页 setup；每页可用自己的 inject / surfaces / config 覆盖 manifest 级声明。"
+        ]
+      },
+      "skills": {
+        "assembledBy": "边车（crates/onion-server/src/app_contrib.rs）",
+        "shape": "(string | { path })[]：技能目录或单个 SKILL.md",
+        "rules": [
+          "目录按技能根扫描（每个子目录一个 SKILL.md）；单文件只放行声明的那一个 .md。",
+          "注册为独立 provider（名 app:<id>:<序号>），与 <ONION_HOME>/skills 并存。",
+          "路径必须落在 App 根目录内且安装期存在，否则 app_contributes_invalid。"
+        ]
+      },
+      "mcpServers": {
+        "assembledBy": "边车（crates/onion-server/src/app_contrib.rs）",
+        "shape": "内联数组 [{ name, command?, args?, env?, cwd?, url?, headers?, toolCallTimeoutMs? }] 或 { path: \"mcp.json\" }",
+        "rules": [
+          "command 即 stdio，url 即 streamable-http，二者其一（command 优先）。",
+          "支持 Claude Code 变量：${CLAUDE_PLUGIN_ROOT} 在装配期替换为 App 根目录（command / args / env / cwd 均可引用），示例：{\"command\":\"node\",\"args\":[\"${CLAUDE_PLUGIN_ROOT}/server.mjs\"]}。",
+          "与既有 server 重名时跳过，不重复注册 mcp__<server>__<tool>。"
+        ]
+      },
+      "hooks": {
+        "assembledBy": "边车（crates/onion-server/src/app_contrib.rs）",
+        "shape": "内联数组 [{ event, matcher?, handler }] 或 { path: \"hooks.json\" }（Claude Code 兼容格式）",
+        "rules": [
+          "多个 App 的配置按事件合并；${CLAUDE_PLUGIN_ROOT} 替换为各自 App 根目录，${CLAUDE_PROJECT_DIR} 替换为会话工作目录。",
+          "hook 脚本执行协议（对齐 Claude Code）：stdin 收 JSON 载荷；stdout 输出决策 JSON —— hookSpecificOutput.additionalContext 注入模型输入（多钩子产出全部拼接），decision:\"block\"+reason 拦截；无输出或 {} 为中性结果。",
+          "多个钩子的输出按事件合并：deny/block 等拦截类决策以最严者生效。",
+          "边车只执行 handler.type=command；bus（前端回调）装配期跳过并记日志。"
+        ]
+      },
+      "agents": {
+        "assembledBy": "未装配（预留）",
+        "shape": "(string | { path })[]",
+        "rules": ["当前不参与会话装配，声明不会报错但也不生效。"]
+      }
+    },
+    "assemblyTiming": "已启用（state.json 中 enabled:true）的 App，其 contributes 在每次会话装配时重新扫描注入；安装 / 启停后新会话即时生效，无需重启边车。"
+  },
+  "install": {
+    "sourceRule": "安装源是「预构建产物目录」：安装期不做 npm / 构建步骤；裸 ESM 直接装 App 目录，构建型装 dist/。",
+    "endpoints": [
+      { "method": "POST", "path": "/v1/apps/install", "body": "{ \"path\": \"<绝对目录>\", \"overwrite\": true }", "note": "UTF-8 无 BOM 字节提交；已装且 overwrite=false → 409 app_exists。" },
+      { "method": "DELETE", "path": "/v1/apps/{id}", "note": "删目录 + 登记项；404 幂等。" },
+      { "method": "PUT", "path": "/v1/apps/{id}/enabled", "body": "{ \"enabled\": true }", "note": "持久化启停，重启保持。" },
+      { "method": "GET", "path": "/v1/apps", "note": "已装清单（manifest + enabled + installed_at_ms）。" },
+      { "method": "GET", "path": "/v1/apps/{id}/{*path}", "note": "静态产物（ESM 相对 import 的解析基准，带 no-store）。" }
+    ],
+    "errors": [
+      "app_manifest_missing / app_manifest_invalid / app_manifest_too_large",
+      "app_id_missing / app_id_invalid / app_name_missing",
+      "app_host_api_unsupported",
+      "app_entry_missing / app_entry_invalid / app_entry_not_found",
+      "app_contributes_invalid",
+      "app_exists / app_copy_failed / app_path_invalid"
+    ]
+  },
+  "constraints": [
+    "setup(ctx) 只登记 slot 与订阅，不做 DOM / 网络副作用；组件惰性 import。",
+    "React 系依赖一律 external（宿主 import map 供给单实例 React），不打包第二份。",
+    "样式限域在自有根类下，颜色 / 字号一律引用壳令牌（var(--ava-*) / var(--cc-*)），禁止硬编码。",
+    "App 不直连 WS、不 fetch 边车以外的地址、不使用 Tauri 特权——平台服务一律经 ctx。",
+    "slot 认领遵循 viewId 全局唯一；引用型面板的 viewId 必须指向已认领的视图。",
+    "contributes 中的路径必须落在 App 根目录内（拒绝绝对路径与 ..），文件须真实存在。"
+  ]
+}

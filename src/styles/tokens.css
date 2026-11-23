@@ -1,0 +1,112 @@
+/* ava2 design token 契约（AppHost 壳与所有 App 共用的唯一语义令牌源）。
+   规则：
+   1. 命名统一 `--ava-<语义>`，按 alias 语义分组（bg-* / label-* / border-* / interactive-* / state-*）。
+   2. 令牌只在此文件定义亮/暗两套，AppHost（App.css）与各 App（apps/chatapp/src/styles.ts 等）一律 var() 消费，禁止另起重复裸色值。
+   3. App 业务专有色彩（气泡、代码块底色等）不进契约，保留在 App 本地令牌内。
+   4. 主题由 documentElement 的 data-theme="light|dark" 切换，子树继承。 */
+:root {
+  /* 背景层次 */
+  --ava-bg-base: #ffffff;
+  --ava-bg-layer-1: #ffffff;
+  --ava-bg-layer-2: #ffffff;
+  --ava-bg-sidebar: #f9fafb;
+  /* 文字三级 */
+  --ava-label-primary: #0f1115;
+  --ava-label-secondary: #61666b;
+  --ava-label-tertiary: #81858c;
+  /* 边框层级（半像素语义） */
+  --ava-border-l1: rgba(0, 0, 0, 0.04);
+  --ava-border-l2: rgba(0, 0, 0, 0.1);
+  --ava-border-l3: rgba(0, 0, 0, 0.12);
+  /* 交互面 */
+  --ava-interactive-bg-hover: rgba(38, 49, 72, 0.06);
+  --ava-nav-active: #ebeef2;
+  --ava-button-elevated-fill: #ffffff;
+  --ava-button-floating-hover: #f1f3f5;
+  /* 状态色（state-business-primary 兼作链接/选中强调色） */
+  --ava-state-business-primary: #4176e6;
+  --ava-state-business-primary-hover: #5585ea;
+  --ava-state-danger: #ec1313;
+  --ava-state-success: #12a150;
+  --ava-state-warning: #b26a00;
+  --ava-brand: #0f1115;
+  /* 阴影 */
+  --ava-shadow-panel: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --ava-shadow-elevated: 0 2px 10px rgba(0, 0, 0, 0.06);
+  /* 滚动条：l1 底面 thumb，hover 加深 */
+  --ava-scrollbar-thumb: #dde0e5;
+  --ava-scrollbar-thumb-hover: #c8cdd4;
+  /* 间隔阶梯（2/4/8/10/16/24）：space-3 = 元素内联（图标↔文字、控件间隙），
+     space-4 = 沟槽（页面外边距 / 卡片间距），space-5 = 分组留白 */
+  --ava-space-0: 2px;
+  --ava-space-1: 4px;
+  --ava-space-2: 8px;
+  --ava-space-3: 10px;
+  --ava-space-4: 16px;
+  --ava-space-5: 24px;
+  /* 圆角阶梯（4/10/12/16/20/28 + 全圆）：xs = 微型控件，sm = 输入框/按钮，
+     md = 列表选中项/导航，lg = 卡片/浮层，panel = 大容器，pill = 徽标 */
+  --ava-radius-xs: 4px;
+  --ava-radius-sm: 10px;
+  --ava-radius-md: 12px;
+  --ava-radius-lg: 16px;
+  --ava-radius-xl: 20px;
+  --ava-radius-panel: 28px;
+  --ava-radius-pill: 999px;
+  /* 结构尺寸 */
+  --ava-tabbar-h: 40px; /* 顶部合并条 / 画布头通用行高（合并后 tab 列表与身份区同排） */
+  /* 字体（对齐 ava-app design-tokens 已验证方案）：
+     UI 字体 HarmonyOS Sans SC（index.html CDN 非阻塞加载）→ 微软雅黑（本地兜底）→ Segoe UI（西文）；
+     不放 system-ui / PingFang SC 等会提前拦截中文字形的字体（否则目标字体永不生效，ava-app 踩坑结论）。
+     等宽栈前端置 ui-monospace 与 Cascadia（Windows Terminal 新等宽）；末尾 NSimSun / SimHei 为中文
+     等宽兜底——缺了它，中文混排（会话 id、代码注释）会回退到非等宽中文字体，宽度参差。 */
+  --ava-font-ui: "HarmonyOS Sans SC", "Microsoft YaHei", "Segoe UI", "Helvetica Neue", arial, sans-serif;
+  --ava-font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", consolas, menlo,
+    "DejaVu Sans Mono", "NSimSun", "SimHei", monospace;
+
+  font-family: var(--ava-font-ui);
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--ava-label-primary);
+  background: var(--ava-bg-base);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+:root[data-theme="dark"] {
+  --ava-bg-base: #151517;
+  --ava-bg-layer-1: #232324;
+  --ava-bg-layer-2: #2c2c2e;
+  --ava-bg-sidebar: #1b1b1c;
+  --ava-label-primary: #f9fafb;
+  --ava-label-secondary: #cfd3d6;
+  --ava-label-tertiary: #adb2b8;
+  --ava-border-l1: rgba(255, 255, 255, 0.06);
+  --ava-border-l2: rgba(255, 255, 255, 0.12);
+  --ava-border-l3: rgba(255, 255, 255, 0.16);
+  --ava-interactive-bg-hover: rgba(255, 255, 255, 0.08);
+  --ava-nav-active: #43454a;
+  --ava-button-elevated-fill: #43454a;
+  --ava-button-floating-hover: #353638;
+  --ava-state-business-primary: #679efe;
+  --ava-state-business-primary-hover: #5b8ef0;
+  --ava-state-danger: #f25a5a;
+  --ava-state-success: #3ecf8e;
+  --ava-state-warning: #f0b429;
+  --ava-brand: #f9fafb;
+  --ava-shadow-panel: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --ava-shadow-elevated: 0 2px 14px rgba(0, 0, 0, 0.45);
+  --ava-scrollbar-thumb: #45474d;
+  --ava-scrollbar-thumb-hover: #585b62;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}

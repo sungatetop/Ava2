@@ -1,0 +1,18 @@
+{
+  "name": "@ava2-app/model-manager",
+  "private": true,
+  "version": "0.2.0",
+  "description": "ava2 AppHost App：模型管理（独立 TS 构建，react external，随安装包分发）",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ava-ai/app-sdk": "file:../../packages/app-sdk"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  }
+}

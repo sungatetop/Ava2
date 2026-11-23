@@ -1,0 +1,15 @@
+{
+  "id": "chatapp",
+  "name": "对话",
+  "version": "0.10.5",
+  "description": "与智能体多轮对话：写作、编程、工具调用，交付物一键在画布打开。",
+  "author": "Ava Team",
+  "homepage": "https://github.com/ava-labs/ava2",
+  "license": "MIT",
+  "hostApi": 2,
+  "inject": ["slots", "agent", "storage", "events"],
+  "surfaces": ["surface.main", "nav.sidebar", "panel.sidebar"],
+  "contributes": {
+    "apps": [{ "id": "main", "entry": "main.js" }]
+  }
+}

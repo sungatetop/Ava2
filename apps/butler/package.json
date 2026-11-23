@@ -1,0 +1,15 @@
+{
+  "name": "@ava2-app/butler",
+  "private": true,
+  "version": "0.4.0",
+  "description": "总管家示例 App：App 层代管 Agent（对话流 + 派发台账 + 纪律代批）。",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  }
+}

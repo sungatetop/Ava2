@@ -1,0 +1,12 @@
+{
+  "id": "usermenu-demo",
+  "name": "用户菜单示例",
+  "version": "0.1.0",
+  "hostApi": 2,
+  "kind": "demo",
+  "inject": ["slots", "events", "storage"],
+  "surfaces": ["surface.main", "nav.sidebar", "user.menu"],
+  "contributes": {
+    "apps": [{ "id": "main", "entry": "app.js" }]
+  }
+}

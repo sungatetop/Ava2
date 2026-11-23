@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ava2 · AppHost</title>
+    <!-- import map 必须位于任何 module script 之前；App bundle 的裸导入（react 等）由此解析到
+         vendor ESM。目标 URL /src/vendor/*.js 与 host alias/shim 的 Vite 解析结果一致（单实例） -->
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "/src/vendor/react.js",
+          "react/jsx-runtime": "/src/vendor/react-jsx-runtime.js",
+          "react/jsx-dev-runtime": "/src/vendor/react-jsx-dev-runtime.js",
+          "react-dom": "/src/vendor/react-dom.js",
+          "react-dom/client": "/src/vendor/react-dom-client.js"
+        }
+      }
+    </script>
+    <!-- 界面字体：HarmonyOS Sans SC（非阻塞加载，首绘使用系统字体回退；与 ava-app 方案一致） -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/harmonyos-sans-sc-webfont-splitted@1.1.0/dist/Regular.css"
+      media="print"
+      onload="this.media='all'"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

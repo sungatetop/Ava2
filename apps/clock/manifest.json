@@ -1,0 +1,11 @@
+{
+  "id": "clock",
+  "name": "时钟",
+  "version": "0.1.0",
+  "hostApi": 2,
+  "inject": ["slots"],
+  "surfaces": ["surface.main", "nav.sidebar"],
+  "contributes": {
+    "apps": [{ "id": "main", "entry": "app.js" }]
+  }
+}

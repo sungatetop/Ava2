@@ -1,0 +1,17 @@
+import * as M from "../node_modules/react-dom/cjs/react-dom.development.js";
+export default M;
+export const __DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE = M.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+export const browser = M.browser;
+export const createPortal = M.createPortal;
+export const flushSync = M.flushSync;
+export const preconnect = M.preconnect;
+export const prefetchDNS = M.prefetchDNS;
+export const preinit = M.preinit;
+export const preinitModule = M.preinitModule;
+export const preload = M.preload;
+export const preloadModule = M.preloadModule;
+export const requestFormReset = M.requestFormReset;
+export const unstable_batchedUpdates = M.unstable_batchedUpdates;
+export const useFormState = M.useFormState;
+export const useFormStatus = M.useFormStatus;
+export const version = M.version;

@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist",
+    "rootDir": "../../src/host",
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "types": []
+  },
+  // 类型单一来源仍是宿主 src/host/types.ts：本包不复制源码，只投影声明产物，
+  // 宿主演进时 npm run build:sdk 重新生成，杜绝双源漂移。
+  "include": ["../../src/host/types.ts"]
+}

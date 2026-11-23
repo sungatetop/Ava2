@@ -1,0 +1,18 @@
+{
+  "name": "@ava2-app/file-explorer",
+  "private": true,
+  "version": "0.2.1",
+  "description": "ava2 工作区文件浏览器：panel.canvas 随画布预览并列展示，可折叠树形浏览，点击文件在画布打开",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ava-ai/app-sdk": "file:../../packages/app-sdk"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  }
+}

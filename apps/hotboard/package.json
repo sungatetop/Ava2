@@ -1,0 +1,18 @@
+{
+  "name": "@ava2-app/hotboard",
+  "private": true,
+  "version": "0.2.0",
+  "description": "ava2 AppHost App：热榜聚合（独立 TS 构建，react external，经 /v1/apps/install 安装）",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ava-ai/app-sdk": "file:../../packages/app-sdk"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@ava2-app/insight",
+  "private": true,
+  "version": "0.2.0",
+  "description": "数据叙事台示例 App：读工作区 CSV → 结论卡 + 图表墙（运营分析场景）。",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  }
+}

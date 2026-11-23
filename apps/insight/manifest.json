@@ -1,0 +1,13 @@
+{
+  "id": "insight",
+  "name": "数据叙事台",
+  "version": "0.2.0",
+  "hostApi": 2,
+  "description": "选工作区 → 选 CSV → 真实读取内容统计，生成结论卡、分布直方图与走势图。面向运营、市场分析。",
+  "author": "Ava Team",
+  "license": "MIT",
+  "icon": "M3 3v18h18V3H3zm16 16H5V5h14v14zM7 13h4v4H7v-4zm6-6h4v10h-4V7z",
+  "inject": ["slots", "agent", "events", "storage"],
+  "surfaces": ["surface.main", "surface.canvas", "nav.sidebar", "panel.sidebar", "panel.canvas"],
+  "entry": "main.js"
+}

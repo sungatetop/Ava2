@@ -1,0 +1,12 @@
+{
+  "id": "file-explorer",
+  "name": "文件浏览",
+  "version": "0.2.1",
+  "description": "浏览工作区文件树，双击文件即可在画布打开预览。",
+  "hostApi": 2,
+  "inject": ["slots", "agent", "events", "storage"],
+  "surfaces": ["panel.canvas"],
+  "contributes": {
+    "apps": [{ "id": "main", "entry": "main.js" }]
+  }
+}

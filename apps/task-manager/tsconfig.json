@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true
+  },
+  // @ava-ai/app-sdk 经 node_modules 解析（根 workspace 链接 → packages/app-sdk/dist/types.d.ts），
+  // 类型单一来源仍为宿主 src/host/types.ts（包由 build:sdk 投影生成）
+  "include": ["src"]
+}
