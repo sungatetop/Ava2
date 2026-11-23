@@ -15,7 +15,7 @@ ava2 的 App 是一个**预构建产物目录**（含 `manifest.json` + ESM 入�
 
 参考实现（广义 App = app（UI/UX）+ skills + hooks + mcpServers 的任意组合，按类型选读）：
 
-- 纯 UI：`apps/hello`（裸 ESM，契约冒烟）、`apps/chatapp`（构建型，React 完整对话 App）、`apps/sessionboard`（多 slot 组合示例）
+- 纯 UI：`apps/hello`（裸 ESM 最小形态）、`apps/chatapp`（构建型，React 完整对话 App）、`apps/sessionboard`（多 slot 组合示例）
 - 纯技能：`apps/app-devkit`（`contributes.skills` 分发 `develop-ava2-app` 技能）
 - 纯 MCP：`apps/mcp-echo`（stdio MCP server，零依赖 Node：`mcp__echo__echo` / `mcp__echo__word_count`）
 - 纯 hooks：`apps/hooks-guard`（Claude Code 格式 `hooks.json`：UserPromptSubmit 注入 + PostToolUse 观测）

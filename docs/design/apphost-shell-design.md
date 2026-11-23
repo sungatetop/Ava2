@@ -1,7 +1,7 @@
 ---
 title: AppHost 宿主壳布局设计
-description: ava2 宿主壳（标题栏 / 侧边栏 / tab 化主区 / 右侧抽屉）的布局结构与 dsh web ui 对齐的设计令牌，供新增壳级控件与 App 视觉对齐参考。
-keywords: AppHost, 宿主壳, 布局, dsh web ui, 设计令牌, 主题, tab
+description: ava2 宿主壳（顶部合并条 / 侧边栏 / tab 化主区 / 画布第二舞台）的布局结构与设计令牌，供新增壳级控件与 App 视觉对齐参考。
+keywords: AppHost, 宿主壳, 布局, 设计令牌, 主题, tab
 author: AI 助手
 date: 2026-11-08
 updated: 2026-11-11
@@ -11,7 +11,7 @@ category: design
 
 # AppHost 宿主壳布局设计
 
-宿主壳负责"装 App"的外层结构，不含任何业务视图。布局参考 `ava/prototypes/app-host-proto/src/Shell.tsx`（三栏 + tab 化主区），视觉与令牌对齐 dsh web ui，使预置 App（chatapp）与三方 App 在同一套色阶、圆角、字号下渲染。
+宿主壳负责"装 App"的外层结构，不含任何业务视图。布局为三栏 + tab 化主区，视觉与令牌对齐统一的 AppHost 设计系统，使预置 App（chatapp）与三方 App 在同一套色阶、圆角、字号下渲染。
 
 ## 1. 结构
 
@@ -36,8 +36,8 @@ app-root                     # 纵向：顶部合并条 + 三栏
 - **一切皆 App**：侧栏导航项全部来自 `registry.navItems()`（App 经 `slots.inject("nav.sidebar")` 贡献）；壳只额外提供 `__apps`（App 管理）一个自有视图，保证"壳与 App 同一契约"。
 - **tab 化主区**：`openViews` 为打开列表（点击导航即打开），渲染期过滤掉已被禁用/卸载 App 的 tab（不在 effect 里剪枝，避免多余重渲染）。关闭当前 tab 则回到"无视图"态。
 - **浮层舞台（多悬浮窗）**：tab 上的悬浮按钮把 `surface.main` 视图脱离 tab 悬浮于主界面之上——overlay 层直接复用 `MainSurface`（App 契约零改动），每窗独立拖动/缩放/还原/关闭，点击置顶，关 tab 连带收层。窗框归壳、内容归 App、是否悬浮归用户（App 不能强弹）。详见 [app-floating-windows-design.md](./app-floating-windows-design.md)。
-- **侧栏交互（对齐 dsh / ava-app）**：右缘 4px 拖拽把手调宽（264–420，`body.resizing` 期间禁用文本选择），标题栏左侧 panel-left 按钮折叠为 56px 图标-only 轨（文字与侧栏面板隐藏）；宽度与折叠态均持久化到 `localStorage`。折叠态不渲染拖拽把手与侧栏面板。
-- **画布第二舞台**（对齐原型 canvas-stage 设计）：
+- **侧栏交互**：右缘 4px 拖拽把手调宽（264–420，`body.resizing` 期间禁用文本选择），标题栏左侧 panel-left 按钮折叠为 56px 图标-only 轨（文字与侧栏面板隐藏）；宽度与折叠态均持久化到 `localStorage`。折叠态不渲染拖拽把手与侧栏面板。
+- **画布第二舞台**：
   - `canvas:home` 启动器 tab 常驻，枚举全部 `surface.canvas` 贡献的 App 卡片（图标 + 标题 + 描述），点击即打开画布 tab；
   - 画布 tab 独立于主区 tab 编排；与主区同构只渲染当前激活视图（tab 间切换/关闭即卸载——lazy-cache 仅驻留组件定义不驻留 state，需跨切换保留的状态由 App 经 `ctx.storage` 自管）；App 被禁用/卸载时对应 tab 自动隐去，失效兜底回启动器；
   - 折叠仅收宽度（右侧 panel-right 按钮开合），视图状态驻留；
@@ -61,8 +61,8 @@ app-root                     # 纵向：顶部合并条 + 三栏
 
 约定：
 
-- 语义色只表达状态（成功/失败/警告/业务强调），不用于装饰；强调色在 dsh 体系里是"墨色"（`--text-primary`），业务蓝仅用于主操作（如发送按钮）。
-- 半像素边框（`0.5px solid var(--border-l*)`）是 dsh 的层次手段，禁止用阴影替代分隔线（抽屉浮层除外）。
+- 语义色只表达状态（成功/失败/警告/业务强调），不用于装饰；强调色是"墨色"（`--ava-label-primary`），业务蓝仅用于主操作（如发送按钮）。
+- 半像素边框（`0.5px solid var(--ava-border-l*)`）是层次手段，禁止用阴影替代分隔线（抽屉浮层除外）。
 - 圆角遵循 4/8/12/16/20/28 阶梯，不引入中间值。
 
 ## 3. 关键控件规格
@@ -87,11 +87,3 @@ app-root                     # 纵向：顶部合并条 + 三栏
 - App 的视觉令牌应引用壳定义的 `var(--*)` 或按同一套数值落局部变量，保证亮/暗主题一致。
 - 壳不向 App 暴露"当前主题"的读写 API；App 只消费 CSS 变量的暗色覆盖即可。
 - 画布契约：App 经 `slots.inject("surface.canvas", { viewId, title, description?, icon?, component })` 认领画布视图；打开走启动器卡片或总线 `canvas.open` 事件，App 不直接操作壳的 tab 状态。
-
-## 5. 验证（2026-11-08）
-
-- 编译级：`tsc --noEmit` 与 `vite build`（含 vendor 重打包）通过；hello 冒烟 App 重装后 `surfaces` 含 `surface.canvas`。
-- 交互清单（浏览器 `http://localhost:1420/`，onion-server 9800）：appbar 折叠开关（56px 图标轨）、侧栏右缘拖拽（264–420）、appbar 右侧按钮开合画布、启动器打开「会话总览」、画布 tab 关闭回启动器、`canvas.open` 总线事件、暗色主题下三栏观感。
-- 合并条验收（2026-11-11）：appbar 高 40、无残留 `.titlebar` / `.tabbar`、身份区与 tab 中线对齐、`.appbar-sep` 0.5×16、折叠侧栏后不横向溢出（10/10 PASS）。
-- 身份区调整（2026-11-11）：移除 `.appbar-dim` 端点文字、徽标贴左（左距 10px）、折叠开关移入身份区右侧并紧贴分隔线（7/7 PASS，亮/暗/折叠三态截图留证）。
-- 分隔线对齐（2026-11-11）：分隔线左缘 279.5 = 侧栏右缘 280，tab 起点 = 侧栏右缘 + 8；拖拽侧栏到 340 时同步跟随；折叠态分隔线落在 55.5/56 且身份区无溢出（7/7 PASS）。

@@ -1,6 +1,6 @@
 ---
 title: App 悬浮舞台设计（浮层式 overlay）
-description: ava2 AgentOS 的 App 悬浮 UI 最终决策：宿主加一个 overlay 层挂 MainSurface，App 主舞台悬浮于主界面之上；记录两轮被否方向（页面内模拟窗、OS 级多窗体）与最终浮层式的实现。
+description: ava2 App 悬浮舞台设计：宿主加一个 overlay 层挂 MainSurface，App 主舞台悬浮于主界面之上，App 契约零改动。
 keywords: ava2, App 契约, 悬浮舞台, overlay, 多悬浮窗, MainSurface, AgentOS, 拖动, 缩放
 author: AI 助手
 date: 2026-11-10
@@ -11,19 +11,13 @@ category: design
 
 # App 悬浮舞台设计（浮层式 overlay）
 
-## 1. 意图与决策演进
+## 1. 设计要点
 
-需求原点：App 是否支持悬浮 UI / 悬浮界面 / 拖动？（宿主 = 操作系统）
+宿主加一个 overlay 层挂 `MainSurface`——App 主舞台悬浮于主界面之上。
 
-| 轮次 | 方向 | 结论 |
-| --- | --- | --- |
-| v1 | 页面内模拟窗：宿主自绘窗框（拖动/缩放/z-order/焦点栈），`ctx.windows.open` 命令式 API | **否**——本质是「舞台内越界的合法化」，自研窗框成本高 |
-| v2 | OS 级多窗体：Tauri `WebviewWindow`，新窗体 = App 独占新舞台 | **否**——超出了当前需要，用户选择了更轻的形态 |
-| v3（采纳） | **浮层式：宿主加一个 overlay 层挂 `MainSurface`**——App 主舞台悬浮于主界面之上 | **已实现** |
+关键洞察：**悬浮的不是「新窗口」，而是「现有主舞台本身」**。`MainSurface` 是按 viewId 渲染 `surface.main` 贡献的独立组件，overlay 层直接复用它，App 契约零改动——任何已认领 `surface.main` 的 App 视图无需任何适配即可悬浮。
 
-v3 的关键洞察：**悬浮的不是「新窗口」，而是「现有主舞台本身」**。`MainSurface` 是按 viewId 渲染 `surface.main` 贡献的独立组件，overlay 层直接复用它，App 契约零改动——任何已认领 `surface.main` 的 App 视图无需任何适配即可悬浮。
-
-## 2. 实现（已落地）
+## 2. 实现
 
 壳层（`src/App.tsx`）：
 
@@ -50,4 +44,4 @@ v3 的关键洞察：**悬浮的不是「新窗口」，而是「现有主舞台
 ## 4. 远期（不承诺）
 
 - 位置/尺寸持久化
-- `ctx.windows` 命令式 API（App 主动请求悬浮）与 OS 级多窗体（v2 方向，需求回归时再评估）
+- `ctx.windows` 命令式 API（App 主动请求悬浮）与 OS 级多窗体

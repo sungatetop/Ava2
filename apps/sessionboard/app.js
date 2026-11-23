@@ -1,5 +1,5 @@
-// 会话工作台（第二个真实 App，roadmap 3.1 狗粮验证）：裸 ESM + import map 供给 react。
-// 契约消费矩阵（docs/solutions/sessionboard-app.md §2）：五类 slot 全量 + 五类 inject 面。
+// 会话工作台（第二个真实 App）：裸 ESM + import map 供给 react。
+// 契约消费矩阵：五类 slot 全量 + 五类 inject 面。
 // - surface.main `board`：会话仪表盘（统计 + 列表 + 新建/删除/试验）；
 // - surface.canvas `live`：对话试验台（选会话 → send → onSessionEvent 流式往返）；
 // - panel.sidebar / panel.canvas：双面板（各自独立拉数据，验证面板 slot 契约）；

@@ -50,12 +50,12 @@ fn job_log_file_spills_under_logs() {
 
 #[test]
 fn normalize_windows_path() {
-    assert_eq!(normalize_cwd(Path::new(r"C:\workspace\SuperAI4")), "C--workspace-SuperAI4");
+    assert_eq!(normalize_cwd(Path::new(r"C:\workspace\demo")), "C--workspace-demo");
 }
 
 #[test]
 fn normalize_posix_path() {
-    assert_eq!(normalize_cwd(Path::new("/workspace/SuperAI4")), "-workspace-SuperAI4");
+    assert_eq!(normalize_cwd(Path::new("/workspace/demo")), "-workspace-demo");
 }
 
 #[test]

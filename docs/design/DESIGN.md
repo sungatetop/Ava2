@@ -1,27 +1,26 @@
 ---
 title: DESIGN.md — ava2 AppHost 设计系统
-description: ava2 宿主壳与所有 App 的唯一设计基准：以 dsh 设计语言为参照系，从 tokens.css / App.css 源码提炼的语义令牌、字体阶梯、间隔圆角、阴影与交互纪律。
+description: ava2 宿主壳与所有 App 的唯一设计基准：从 tokens.css / App.css 源码提炼的语义令牌、字体阶梯、间隔圆角、阴影与交互纪律。
 keywords: ava2, AppHost, 设计系统, design token, DESIGN.md, 字体阶梯, 交互规范
 author: AI 助手
 date: 2026-11-11
-updated: 2026-11-11
+updated: 2026-11-23
 status: done
 category: design
 ---
 
 # Design System: ava2 AppHost
 
-> ava2 的**唯一设计基准**。形态与谱系承自 [dsh 设计系统](../references/DESIGN.md)（参照系），
-> 但全部数值**提取自 ava2 源码实测**——`src/styles/tokens.css`（令牌权威）、`src/App.css`（壳组件）、
-> `index.html`（字体加载）——非估算值。与 dsh 的差异在第 9 节差异表中显式登记。
+> ava2 的**唯一设计基准**。全部数值**提取自 ava2 源码实测**——`src/styles/tokens.css`（令牌权威）、
+> `src/App.css`（壳组件）、`index.html`（字体加载）——非估算值。
 >
 > 生成或改造 ava2 的任何 UI（壳组件或 App）前，**先读本文件**；令牌一律 `var(--ava-*)` 消费，
 > 禁止另起裸色值。
 
 ## 1. Visual Theme & Atmosphere
 
-**「多舞台的工具型工作台」**——ava2 是 AppHost 桌面壳：36px 标题栏 + 三栏骨架（侧栏 →
-tab 主区 → 画布第二舞台），App 以 slot 注入舞台。视觉气质继承 dsh 的克制传统：蓝灰中性
+**「多舞台的工具型工作台」**——ava2 是 AppHost 桌面壳：40px 顶部合并条 + 三栏骨架（侧栏 →
+tab 主区 → 画布第二舞台），App 以 slot 注入舞台。视觉气质克制：蓝灰中性
 基底 + 单一品牌蓝，交互反馈走**半透明填充与透明度**而非色相漂移，边界用 **0.5px 发丝线**，
 阴影极淡、深色模式层次分离靠描边承担。
 
@@ -29,8 +28,8 @@ tab 主区 → 画布第二舞台），App 以 slot 注入舞台。视觉气质�
 - **Variance：2/10**（严格对称的三栏结构化布局，无装饰性构图）
 - **Motion：4/10**（轻快安静：0.12–0.2s 标准 ease，只动 fill/opacity/color 与 6px 内位移）
 
-ava2 相对 dsh 的两处气质增量：**pill 全圆形态比例更高**（弹窗按钮/搜索框/开关/tag 全线
-999px 圆），以及**主操作按钮 = 品牌蓝实底白字**（dsh 主按钮是中性黑）。
+两处气质特征：**pill 全圆形态比例高**（弹窗按钮/搜索框/开关/tag 全线
+999px 圆），以及**主操作按钮 = 品牌蓝实底白字**。
 
 ## 2. Color Palette & Roles
 
@@ -55,7 +54,7 @@ ava2 相对 dsh 的两处气质增量：**pill 全圆形态比例更高**（弹�
 
 - **Business Blue** `#4176e6`（浅）/ `#679efe`（深）— 品牌蓝：主按钮实底、focus 描边、
   选中下划线、拖拽手柄高亮、用户头像底。**hover 档** `#5585ea`（浅，提亮）/ `#5b8ef0`
-  （深，加深）——跟随 dsh「浅色 hover 提亮、深色 hover 加深」方向。深色模式提亮一档
+  （深，加深）——浅色 hover 提亮、深色 hover 加深。深色模式提亮一档
   保证暗面可读。
 - **Brand Neutral** `#0f1115` → `#f9fafb` — 中性品牌色（**黑/白随主题翻转**）：仅用于
   titlebar 徽标（黑底白字）。主操作一律品牌蓝，中性黑不做按钮底。
@@ -84,7 +83,7 @@ ava2 相对 dsh 的两处气质增量：**pill 全圆形态比例更高**（弹�
 - **UI Sans**：`"HarmonyOS Sans SC" → "Microsoft YaHei" → "Segoe UI" → "Helvetica Neue" → arial`
   HarmonyOS Sans SC 经 index.html **CDN 非阻塞加载**（`media="print"` 换轨），首绘走系统
   回退。**禁前置 `system-ui` / `PingFang SC` 等会提前拦截中文字形的字体**——否则目标字体
-  永不生效（ava-app 踩坑结论）。
+  永不生效。
 - **Code Mono**：`ui-monospace → "SF Mono" → "Cascadia Mono" → "JetBrains Mono" → consolas
   → menlo → "DejaVu Sans Mono" → "NSimSun" → "SimHei"`。**末尾 NSimSun/SimHei 为中文等宽
   兜底**——缺了它，中文混排（会话 id、代码注释）会回退非等宽中文字体，宽度参差。
@@ -104,11 +103,11 @@ ava2 相对 dsh 的两处气质增量：**pill 全圆形态比例更高**（弹�
 
 ### 3.2 字重纪律
 
-只允许 **400 / 500 / 600 / 700** 四档；新代码禁中间值（存量 650 待收敛）。
+只允许 **400 / 500 / 600 / 700** 四档；新代码禁中间值。
 
 ## 4. Spacing, Radius & Shape
 
-### 4.1 间距：显式 token 六档（ava2 签名，dsh 无）
+### 4.1 间距：显式 token 六档
 
 ava2 **把间距收敛为令牌**，组件一律 `var(--ava-space-N)`：
 
@@ -146,7 +145,7 @@ ava2 **把间距收敛为令牌**，组件一律 `var(--ava-space-N)`：
 两条硬规则：
 1. **微控件用 xs**：16px 以下的小操作钮（tab-close、tab-float）取 radius-xs(4)，否则圆角
    吃掉可点面积观感。
-2. **全圆组件不配平滑圆角机制**：ava2 未引入 dsh 的 corner-shape superellipse，全圆直接
+2. **全圆组件不配平滑圆角机制**：未引入 corner-shape superellipse，全圆直接
    `border-radius: var(--ava-radius-pill)`，无引擎差异问题。
 
 ### 4.4 结构尺寸（壳骨架常量）
@@ -158,7 +157,7 @@ ava2 **把间距收敛为令牌**，组件一律 `var(--ava-space-N)`：
 
 ## 5. Elevation & Shadow
 
-两档单层柔影（dsh 三件套在 ava2 简化为两档）：
+两档单层柔影：
 
 - **Elevated** `0 2px 10px rgba(0,0,0,0.06)` / 深 `0 2px 14px rgba(0,0,0,0.45)` —
   启动器 tile 图标、悬浮窗（轻浮起）
@@ -169,7 +168,7 @@ ava2 **把间距收敛为令牌**，组件一律 `var(--ava-space-N)`：
 - 浮层一律 **0.5px 发丝描边 + 柔影并存**；深色模式投影变浓但层次分离仍由描边兜底。
 - **z-index 阶梯**：画布手柄 5 → 悬浮窗 20 → 上浮菜单 30 → 宿主模态 40。新增浮层按序插入，
   禁跳级。
-- ava2 未采用 dsh「0.5px 画进 box-shadow」手法——直接真 0.5px border（不占布局问题在
+- 未采用「0.5px 画进 box-shadow」手法——直接真 0.5px border（不占布局问题在
   ava2 尚未出现，保持简单）。
 
 ## 6. Component Stylings
@@ -181,11 +180,11 @@ ava2 **把间距收敛为令牌**，组件一律 `var(--ava-space-N)`：
   **身份区宽度 = 侧栏宽度**（行内注入 `--ava-sidebar-w`，`width: calc(... - 10px)`），
   分隔线正落在侧栏右缘、tab 起点与下方主区列对齐；侧栏拖拽变宽时同步跟随。侧栏折叠到
   56px 图标轨时收起名称与状态点，只留徽标 + 折叠钮。**不展示后端端点文字**——连接状态
-  由状态点颜色表达。原 titlebar(36px) 与 tabbar(40px) 两行已合一，省 36px 纵向空间。
+  由状态点颜色表达。titlebar 与 tabbar 已合并为单行，省 36px 纵向空间。
 - **nav-link**：32px 高、radius-md、图标 18px；hover = Hover Wash + 文字提亮；
   active = Nav Active 实底 + 字重 500。
 - **tab**：28px 高、radius-sm；hover = Wash；选中 = Nav Active 实底 + **底部 16×2px
-  强调色短下划线**（与 hover 灰底拉开区分，ava2 签名）。tab 列表 `flex: 0 1 auto` +
+  强调色短下划线**（与 hover 灰底拉开区分）。tab 列表 `flex: 0 1 auto` +
   `overflow-x: auto`（滚动条隐藏，滚轮纵向手势映射为横向），单个 tab `flex: 0 0 auto`
   不被压缩——多 App 时靠滚动而非挤压。标题 `max-width: 160px` + 省略号。
 - **tab 悬浮按钮**：`position: absolute` 落在关闭钮左侧的内隙，**常态不占宽度**，
@@ -201,7 +200,7 @@ ava2 **把间距收敛为令牌**，组件一律 `var(--ava-space-N)`：
     （浅提亮 / 深加深，非 wash 手法——实底色块用专用 hover 档）；
   - `btn-ghost`：0.5px 描边 + 透明底，hover = Wash；
   - `btn-danger`：**常态弱化为 secondary 外观，hover 才转红**（`rgba(236,19,19,0.08)` 底 +
-    danger 字）——红只在不可逆操作瞬间出现，ava2 签名交互。
+    danger 字）——红只在不可逆操作瞬间出现。
 - **默认 button 元素**（工具性小按钮）：13px、radius-sm、0.5px l2 发丝边框、hover 边框转
   tertiary（带 0.15s 过渡）；disabled `opacity 0.45`。
 - **输入框**：0.5px l2 描边、radius-sm/置 pill、`bg-layer-1/2`；focus 描边变品牌蓝
@@ -223,9 +222,9 @@ ava2 **把间距收敛为令牌**，组件一律 `var(--ava-space-N)`：
   → 0.2s（开关），一律标准 `ease`。**无 transition-duration token、无 spring、无编排**——
   动效只动 fill/opacity/color 与 ≤6px 位移。
 - **Hover 显隐**：tab 悬浮钮静息 `opacity: 0`，hover/active 态 `opacity: 1`（0.12s）——
-  用 opacity 而非 display，布局零位移（对齐 dsh data-actions-reveal 思想）。
+  用 opacity 而非 display，布局零位移。
 - **Focus Ring**：全局 `:focus-visible` = 2px 强调色 `outline` + 2px offset（键盘 Tab
-  导航显示，鼠标点击由浏览器模态判定抑制）。ava2 未实现 dsh 的 `data-input-modality`
+  导航显示，鼠标点击由浏览器模态判定抑制）。未实现 `data-input-modality`
   显式指针抑制——依赖浏览器原生 focus-visible 行为，禁改用 `:focus` 全量显示。
 - **状态表达三板斧**：hover 半透明叠加 → active 实底加深 → disabled 45% 透明度。
   色相永不漂移（实底色块用专用 hover 档，见 §2.2）。
@@ -246,30 +245,22 @@ ava2 **把间距收敛为令牌**，组件一律 `var(--ava-space-N)`：
 11. **禁转圈 spinner**：加载用文案弱化或骨架占位，不引入重阴影与旋转动画。
 12. **禁单主题交付**：新增样式必须亮/暗双态验证（截图各留一张）。
 
-## 9. 与 dsh 参照系的差异表（决策记录）
+## 9. 关键设计决策
 
-ava2 有意偏离 dsh 的全部决策点，改动前先对照此表：
-
-| 维度 | dsh | ava2 | 缘由 |
-| --- | --- | --- | --- |
-| 间距 | 无 token，4px 网格字面值 | **六档 `--ava-space-*` 显式令牌** | App 可注入消费，契约化 |
-| 圆角 sm | 8px | **10px** | 输入框/按钮手感更圆润 |
-| 阴影 | 三件套（描边画进 shadow） | 两档单层柔影 + 真 0.5px border | 实现简单，视觉等价 |
-| 主按钮 | 中性黑底白字 | **品牌蓝实底白字**（中性黑只做徽标） | ava2 品牌识别 |
-| pill 比例 | 控件少用 | 高频（按钮/搜索/开关/tag） | 桌面工作台亲和感 |
-| 字体 | 系统栈（Segoe UI/PingFang） | **HarmonyOS Sans SC CDN + 雅黑兜底** | 对齐 ava-app 已验证方案 |
-| mono 兜底 | CJK 回退 PingFang/雅黑 | **NSimSun/SimHei 中文等宽兜底** | 混排等宽需求 |
-| Focus | data-input-modality 显式抑制 | 原生 `:focus-visible` | 壳层简单优先 |
-| 平滑圆角 | corner-shape superellipse | 未引入 | 引擎兼容面收窄 |
-| warning | label 琥珀 `#dd8629` | **`#b26a00`（浅）/`#f0b429`（深）** | 浅色文字对比度 |
-| 发丝线档位 | l1–l4 | **l1–l3** | 未用到 l4，缺时再补 |
-| 壳字号 | 默认 14 | root 14 / 组件主用 13 | 桌面密度 |
-
-**存量不一致收敛记录（2026-11-11 全部完成）**：① 默认 button 1px 实线 → 0.5px 发丝线
-（补 0.15s 过渡）；② `user-pop-group-title` 字重 650 → 600；③ `btn-solid` hover brightness
-→ 专用 hover 档 `--ava-state-business-primary-hover`（新增 token）；④ `.canvas-resizer:hover`
-未定义的 `--ava-state-focus` 引用 → `--ava-state-business-primary`。顺带收敛：
-`confirm-desc` 12.5px → 13/20 档、`drawer-switch` disabled 0.5 → 0.45 统一。
+| 维度 | 决策 | 缘由 |
+| --- | --- | --- |
+| 间距 | **六档 `--ava-space-*` 显式令牌** | App 可注入消费，契约化 |
+| 圆角 sm | **10px** | 输入框/按钮手感更圆润 |
+| 阴影 | 两档单层柔影 + 真 0.5px border | 实现简单，视觉等价 |
+| 主按钮 | **品牌蓝实底白字**（中性黑只做徽标） | 品牌识别 |
+| pill 比例 | 高频（按钮/搜索/开关/tag） | 桌面工作台亲和感 |
+| 字体 | **HarmonyOS Sans SC CDN + 雅黑兜底** | 中文字形优先 |
+| mono 兜底 | **NSimSun/SimHei 中文等宽兜底** | 混排等宽需求 |
+| Focus | 原生 `:focus-visible` | 壳层简单优先 |
+| 平滑圆角 | 未引入 superellipse | 引擎兼容面收窄 |
+| warning | **`#b26a00`（浅）/`#f0b429`（深）** | 浅色文字对比度 |
+| 发丝线档位 | **l1–l3** | 未用到 l4，缺时再补 |
+| 壳字号 | root 14 / 组件主用 13 | 桌面密度 |
 
 ## 10. Token 契约速查
 

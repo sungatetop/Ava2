@@ -19,7 +19,7 @@ onion-server（`crates/onion-server`）是 ava2 的**常驻边车**：axum HTTP/
 | --- | --- | --- |
 | web-ui 开发态 | 开发者手动/脚本（`onion-server.exe --port 9800`） | 需配置 `ONION_SERVER_CORS_ORIGINS` 包含 web-ui 源 |
 | web-ui 纯浏览器 | 同上（远程或本机） | `?backend=` 指向可达地址 |
-| 桌面端（已落地） | Tauri 壳在 setup 阶段 spawn 子进程（`src-tauri/src/sidecar.rs`，`dev.ps1` 一键启动） | 参照 ava 的 sidecar 约定：注入端口/CORS 环境变量、窗口销毁 kill 子进程树、日志滚动（见 §7） |
+| 桌面端 | Tauri 壳在 setup 阶段 spawn 子进程（`src-tauri/src/sidecar.rs`，`dev.ps1` 一键启动） | 注入端口/CORS 环境变量、窗口销毁 kill 子进程树、日志滚动（见 §7） |
 
 生命周期极简：**启动即常驻，ctrl-c（SIGINT）优雅关停**（进行中请求走完），无守护/重启逻辑——崩溃恢复交由宿主重启进程（桌面端壳负责，web 态交开发者/运维）。
 
@@ -30,7 +30,7 @@ onion-server（`crates/onion-server`）是 ava2 的**常驻边车**：axum HTTP/
 1. **端口**：`--port N` > `ONION_SERVER_PORT` > 默认 `9800`；绑定 `127.0.0.1:port`（仅回环，不对外网暴露）。占用即 `bind failed` 退出——**宿主启动前应先探测端口或显式传空闲端口**。
 2. **模型配置**：`Config::from_env()`（`SMOKE_LLM_*` 系列环境变量；打印 `model / base_url`）。
 3. **日志目录**：`<data_home>/logs/onion-server/`（创建失败仅告警，不阻断）。
-4. **工作区兜底**：`ONION_SERVER_WORKSPACE` > 进程 cwd；决定会话默认落盘容器 `<ONION_HOME>/sessions/<normalized-cwd>/`（语义对齐 dsh `sandboxPolicy.workspaceRoot`：会话未显式给 `cwd` 时用它）。
+4. **工作区兜底**：`ONION_SERVER_WORKSPACE` > 进程 cwd；决定会话默认落盘容器 `<ONION_HOME>/sessions/<normalized-cwd>/`（会话未显式给 `cwd` 时用它）。
 5. **访问令牌**：`ONION_SERVER_TOKEN` 非空时 `/v1` 要求 `X-Onion-Token`（运维面）；`ONION_A2A_TOKEN` 非空时 `/a2a*` 接受 mesh 令牌或运维令牌任一（agent 面）。
 6. **AgentCard**：well-known 发现文档（`/.well-known/agent-card.json`），含 instance_id、capabilities、skills。
 7. **App 仓库**：`ONION_APPS_DIR` > `<data_home>/apps`，创建失败 exit(1)（App 面是宿主必需能力）。
@@ -62,7 +62,7 @@ onion-server（`crates/onion-server`）是 ava2 的**常驻边车**：axum HTTP/
 
 ## 5. App 仓库（rest/apps.rs）
 
-安装模型对齐 dsh 插件：**一个 App = 一个目录，安装即受控复制**。
+安装模型：**一个 App = 一个目录，安装即受控复制**。
 
 ### 5.1 目录与登记表
 
@@ -102,9 +102,9 @@ onion-server（`crates/onion-server`）是 ava2 的**常驻边车**：axum HTTP/
 
 `ONION_HOME` 由 onion 的 `paths::data_home()` 解析（环境变量覆盖，缺省用户主目录）；宿主与 App **不直接读写**这些目录，一律经 REST。
 
-## 7. 与桌面端的集成契约（已落地，参照 ava sidecar 约定）
+## 7. 与桌面端的集成契约
 
-1. 壳在 `setup` 阶段 spawn 边车子进程：`onion-server.exe --port <动态分配>`（或 `AVA`→`ONION` 环境变量注入），**避免固定端口冲突**。
+1. 壳在 `setup` 阶段 spawn 边车子进程：`onion-server.exe --port <动态分配>`（或经环境变量注入），**避免固定端口冲突**。
 2. 日志重定向到 `<data_dir>/logs/`，每次启动滚动 `.old`。
 3. 窗口销毁时 kill 子进程（防残留占用端口）。
 4. 前端经 `invoke("backend_base")` 取实际基址（§3 第一优先级）。

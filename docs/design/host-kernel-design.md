@@ -11,7 +11,7 @@ category: design
 
 # 宿主内核设计
 
-`src/host/` 是 AppHost 的内核层，**框架无关**（React 绑定独立在 [AppHost.tsx](file:///c:/workspace/SuperAI4/ava2/src/host/AppHost.tsx)）。蓝本为 ava 原型的 host 内核，裁剪了 backend plugin 通道（onion-server 无插件概念）。
+`src/host/` 是 AppHost 的内核层，**框架无关**（React 绑定独立在 `src/host/AppHost.tsx`）。
 
 ## 1. 模块地图
 
@@ -103,7 +103,7 @@ discoverAndBoot()
 - **错误隔离**：每份贡献独立 `ErrorBoundary`，key 含 `lazyId(Comp)` 实例 id——热重载换新模块时边界 remount、error 自动重置；一个 App 崩溃不影响其他 App。
 - **画布驻留**：画布 tab 关闭不卸载（壳层仅收宽度），lazy 实例驻留 lazy-cache；App 卸载后贡献消失，tab 渲染期过滤自动隐去。
 
-## 8. 与 ava 冻结契约的差异（有意裁剪）
+## 8. 契约裁剪说明
 
 | 差异 | 原因 |
 | --- | --- |
@@ -113,7 +113,7 @@ discoverAndBoot()
 | contributes 仅装配 `apps`（UI 多页） | 技能/MCP/agents/hooks 由边车自持，宿主不重复装配 |
 | storage / 启停态落 localStorage + 边车登记表 | 无 backend plugin 存储面 |
 
-## 9. 已知边界与后续
+## 9. 已知边界
 
 - `panel.canvas` / `panel.sidebar` 的 viewId 是**引用**，壳不做「指向的视图不存在」的强校验（面板自然不渲染）；如需严格化，可在 inject 时校验认领表。
 - 总线事件名是开放字符串空间，`canvas.open` 等为约定事件；后续若加事件建议在 types.ts 集中声明常量。

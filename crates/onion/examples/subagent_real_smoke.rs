@@ -11,7 +11,7 @@
 //!
 //! 运行：
 //! ```powershell
-//! $env:ONION_HOME="c:\workspace\SuperAI4\.onion-test"
+//! $env:ONION_HOME="<仓库根>\.onion-test"
 //! cargo run -p onion --example subagent_real_smoke
 //! ```
 

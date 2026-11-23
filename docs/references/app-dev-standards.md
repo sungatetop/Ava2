@@ -38,7 +38,7 @@ category: references
 
 ### 2.1 目录与 id
 
-- 源码位置固定为 `ava2/apps/<id>/`，`<id>` 必须与 `manifest.id` **完全一致**。
+- 源码位置固定为 `apps/<id>/`，`<id>` 必须与 `manifest.id` **完全一致**。
 - `id` 规则：`^[A-Za-z0-9._-]{1,64}$`，推荐 kebab-case。
 
 ### 2.2 选形态
@@ -223,7 +223,7 @@ hostApi≥2 支持五类贡献，彼此独立可组合；skills / mcpServers / h
 
 ```powershell
 # 安装（body 必须是 UTF-8 无 BOM 字节；Set-Content 默认带 BOM 会解析失败）
-$body = '{"path":"C:\\workspace\\SuperAI4\\ava2\\apps\\my-app","overwrite":true}'
+$body = '{"path":"<仓库根>/apps/my-app","overwrite":true}'
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:9800/v1/apps/install `
   -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($body))
 
@@ -267,7 +267,7 @@ Invoke-RestMethod -Method Delete -Uri http://127.0.0.1:9800/v1/apps/my-app   # �
 ## 9. 交付前自检清单
 
 ```powershell
-cd C:\workspace\SuperAI4\ava2
+cd <仓库根>
 npm run check:contracts    # SPEC 防漂移 + 全部 manifest 校验，0 error 才算交付
 ```
 

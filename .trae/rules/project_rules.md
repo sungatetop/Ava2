@@ -1,6 +1,6 @@
 # ava2 项目开发规范
 
-本文件是 **ava2 独立工程**的项目规则（与根目录 `.trae/rules/project_rules.md` 的 ava 平台规范并行，冲突时以本文件为准）。所有 AI 助手与开发者在本目录内工作均须遵守。
+本文件是 **ava2 工程**的项目规则。所有 AI 助手与开发者在本目录内工作均须遵守。
 
 ## 1. 项目定位
 
@@ -16,10 +16,10 @@ ava2 是 **AppHost 原型的落地实践**：Tauri 桌面壳 + 可插拔 App 契
 ```
 ava2/
 ├── Cargo.toml              # Rust workspace（仅 onion 系 crate）
-├── clippy.toml             # clippy 配置（与 ava 一致）
+├── clippy.toml             # clippy 配置
 ├── rustfmt.toml            # rustfmt 配置
 ├── dev.ps1                 # 一键调试：构建边车 → 拷贝 resources → tauri dev
-├── crates/                 # Rust workspace 成员（onion 系，从 ava/crates 复制）
+├── crates/                 # Rust workspace 成员（onion 系）
 │   ├── onion/              # 内核库
 │   ├── onion-jobs/         # 后台任务注册表
 │   ├── onion-cli/          # CLI 入口
@@ -32,6 +32,7 @@ ava2/
 ├── src-tauri/              # Tauri 壳（独立 Cargo.lock，不并入 workspace）
 │   ├── src/sidecar.rs      # onion-server 边车拉起/守护
 │   └── resources/          # 边车产物（构建后拷贝，不入库）
+├── apps/                   # 可插拔 App
 └── docs/                   # 文档根（见第 3 节）
 ```
 
@@ -39,25 +40,21 @@ ava2/
 
 ### 3.1 保存位置
 
-- 所有文档 / 报告**必须以 Markdown（`.md`）保存**，统一存放于 **`ava2/docs/`**。
+- 所有文档 / 报告**必须以 Markdown（`.md`）保存**，统一存放于 **`docs/`**。
 - 禁止散落在项目根目录、`src/`、`crates/` 或其他非文档目录。
 
 ### 3.2 分类归档
 
-`ava2/docs/` 采用六分类结构，根部放 `index.md` 作为入口：
+`docs/` 采用两分类结构，根部放 `index.md` 作为入口：
 
 ```
-ava2/docs/
+docs/
 ├── index.md          # 文档入口（目录导航 + 阅读顺序）
-├── design/           # 设计：架构总览 / 模块设计 / 契约设计
-├── decisions/        # 决策：ADR 与历史决策记录
-├── plans/            # 计划：roadmap / 后续计划 / backlog
-├── solutions/        # 解决方案：具体功能/问题的实现方案
-├── reports/          # 报告：进度快照 + 评审/分析/验收报告
-└── references/       # 参考资料：使用指南 / 外部框架研究 / 源码地图
+├── design/           # 设计：架构总览 / 模块设计 / 契约设计 / 设计系统
+└── references/       # 参考：App 开发指南 / 开发规范 / 图标规范
 ```
 
-分类判定：设计 vs 解决方案看是否针对具体功能/问题（后者进 `solutions/`）；计划只放宏观 roadmap；报告统一收纳进度与评审类。
+分类判定：架构与契约类进 `design/`；面向开发者的指南与规范进 `references/`。开发过程记录（计划、进度报告、问题修复方案）不入库。
 
 ### 3.3 Frontmatter
 
@@ -84,7 +81,7 @@ category: design
 
 ### 4.1 构建与测试
 
-- workspace 在 `ava2/` 下：`cargo build` / `cargo test`；改动单个 crate 优先 `cargo test -p <crate>`。
+- workspace 在仓库根：`cargo build` / `cargo test`；改动单个 crate 优先 `cargo test -p <crate>`。
 - 不使用 `cargo test --all-features` 做常规验证（扩大构建矩阵与磁盘占用）。
 - 修改依赖后确认 `Cargo.lock` 随改动提交。
 - 编译耗时属正常现象，不要用 PID 强杀。
@@ -124,7 +121,7 @@ category: design
 
 ### 6.2 启动方式
 
-- 统一使用 `ava2/dev.ps1`（在 `ava2/` 下执行 `.\dev.ps1`），**不要**直接 `npm run dev` 单独起 Vite。
+- 统一使用仓库根的 `dev.ps1`（执行 `.\dev.ps1`），**不要**直接 `npm run dev` 单独起 Vite。
 - 脚本流程：`cargo build -p onion-server` → 拷贝到 `src-tauri/resources/` → 设置 `ONION_HOME` / `ONION_SERVER_PORT` → `npm run tauri dev`。
 - 参数：`-SkipBuild`（复用已有产物）、`-Port <n>`（默认 9800）。
 - 边车由 Tauri 壳在 `setup` 阶段 spawn（`src-tauri/src/sidecar.rs`），日志落 `<ONION_HOME>/logs/onion-server.log`（每次启动滚动为 `.old`），窗口退出时终止进程树。

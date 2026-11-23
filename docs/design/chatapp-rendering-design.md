@@ -11,7 +11,7 @@ category: design
 
 # chatapp 渲染层设计
 
-chatapp 是 AppHost 契约的首个试点 App（`ava2/apps/chatapp/`），渲染对齐 ava-app / dsh web ui 的对话形态：过程（thinking 折叠 + 工具步骤行）与最终回答（markdown）分离。本文说明其渲染层的关键设计。
+chatapp 是 AppHost 契约的首个试点 App（`apps/chatapp/`），渲染采用「过程与最终回答分离」的对话形态：过程（thinking 折叠 + 工具步骤行）与最终回答（markdown）分列。本文说明其渲染层的关键设计。
 
 ## 1. 渲染模型（chat-types.ts）
 
@@ -54,7 +54,7 @@ chatapp 是 AppHost 契约的首个试点 App（`ava2/apps/chatapp/`），渲染
 
 ## 4. 组件结构（items.tsx）
 
-对话视觉**以 dsh web ui 为准**：助手消息无气泡、无边框、无头像，过程与回答同列排布；用户消息为右对齐气泡。
+对话视觉遵循 AppHost 设计系统：助手消息无气泡、无边框、无头像，过程与回答同列排布；用户消息为右对齐气泡。
 
 ```
 ChatItems(items)                     # 条目流（无轮次卡底色、无「重新生成」）
@@ -74,8 +74,8 @@ ChatItems(items)                     # 条目流（无轮次卡底色、无「�
 
 - **过程头文案**：进行中为「处理中…」；收束后为「已完成 · N 步 · reason」（数字 `tabular-nums`），折叠体承载思考与工具行。
 - **工具状态**：改用状态点表达（done 绿 / error 红 / running 旋转环 / idle 灰），不再用文字标签。
-- **复制**：仅助手正文提供 `navigator.clipboard.writeText`；dsh 无「重新生成」，故不提供重试按钮——重发由用户重新输入（`assistant_attempt` 仍以 RetryNote 提示）。
-- **样式注入**：全部样式为 `styles.ts` 导出的 `chatappCss` 字符串，由 ChatView 在根节点内以 `<style>` 注入，且统一限域在 `.cc-root` 下；避免 `setup()` 直接操作 DOM（契约要求 setup 只登记 slot 与订阅）。令牌按 dsh 数值落 `.cc-root` 局部变量，并在 `[data-theme="dark"]` 下覆盖，跟随宿主主题。
+- **复制**：仅助手正文提供 `navigator.clipboard.writeText`；不提供「重新生成」按钮——重发由用户重新输入（`assistant_attempt` 仍以 RetryNote 提示）。
+- **样式注入**：全部样式为 `styles.ts` 导出的 `chatappCss` 字符串，由 ChatView 在根节点内以 `<style>` 注入，且统一限域在 `.cc-root` 下；避免 `setup()` 直接操作 DOM（契约要求 setup 只登记 slot 与订阅）。令牌按设计系统数值落 `.cc-root` 局部变量，并在 `[data-theme="dark"]` 下覆盖，跟随宿主主题。
 
 ## 5. 会话装配与切换（chat-view.tsx）
 
@@ -89,45 +89,11 @@ ChatItems(items)                     # 条目流（无轮次卡底色、无「�
 
 App 经 `ctx.agent`（AgentChannel，`src/host/agent.ts`）访问：`listSessions` / `getSession` / `createSession` / `send` / `getPending` / `replyApproval` / `replyPlanReview` / `answerQuestion` / `onSessionEvent`。事件帧为宿主透传的 onion `SessionNotice`（松散 JSON），chatapp 不直连 WS。
 
-## 7. 冒烟结论（2026-11-08）
+## 7. 图片进入上下文的两层预算
 
-以 onion-server（9800，CORS `http://localhost:1420`）+ vite dev 实测：
+图片经工具结果以标准图片块进入多模态输入，需两层预算保证正常截图不被上下文压缩卸载：
 
-- 宿主外壳：标题栏「Ava」+ 侧栏「对话 / 冒烟 / App 管理」三项 + 主区 tab + 主区舞台渲染正常；控制台无 error。
-- 会话头部：会话下拉（历史会话可切换）+ 新会话按钮渲染正常；
-- 完整轮次：折叠过程头（默认收起，文案「已完成 · N 步 · reason」/「处理中…」）、展开后为思考文本 + 工具步骤行（状态点三态 + 输入/结果详情）、markdown 回答（标题/列表/代码块语言条 + 复制）、单轮次聚合；
-- 审批卡全链路：bash 重定向命中 DANGEROUS → `approval_requested` 卡片 → 批准 → AllowedOnce 执行，连续 4 次交互均正常；
-- 会话切换：新建会话视图重置；切回历史会话快照重放（条目 + hover 复制按钮）；
-- 已知限制：CDP 自动化环境 `navigator.clipboard.writeText` 权限受限，「已复制」反馈无法在自动化下断言（真实 WebView2 不受影响）。
+- **层 1 · 进上下文前预算**（`onion/src/media.rs`，`read_image` 返回前）：像素 >1.15MP → 长边 1568 + 面积比例缩放重编码（alpha 走 PNG / 其余 JPEG q85；重编码不小于原图则保留原图，失败降级不失败请求）；字节 >1MB → 压缩重编码；解码失败/损坏 → 文本占位。请求视图另以 `evict_old_images` 封顶历史图片 ≤4 张（kernel 装配先于 prune_view 应用）。transcript/state 原件不动。
+- **层 2 · 估算封顶**（`compaction/estimate.rs::IMAGE_TOKEN_ESTIMATE = 2048`）：图片按预算后固定单图估算，不再按 data URL 字符数折算——估算面向预算后的请求视图而非原始字节。
 
-## 8. 视觉能力冒烟（2026-11-08）
-
-目标：验证「截图/图片经工具结果以标准图片块进入多模态输入，模型能否描述图片内容」。链路：REST 建会话（cwd 指向冒烟目录）→ 模型调 `read_image`（`crates/onion/tools/basic.rs`，读沙箱内 png/jpg/jpeg/gif/webp → data URL 图片块）→ LLM 请求装配 → Qwen3.8-27B（local 网关）描述。
-
-### 8.1 发现并修复的边车 bug（`llm.rs` `wire_message`）
-
-`Role::Tool` 分支只拼接 ToolResult 的 Text 块，**Image 块被静默丢弃**——图片在会话持久层（`tool_result` 事件）存在，但发往 LLM 的请求里消失。表现为模型收到「成功但无内容」的工具结果后**幻觉编造描述**（声称看到 1080×720 动漫少女，与实际测试图完全无关，声称的尺寸/大小也与真实文件不符）。
-
-定位方法：绕过 onion 用裸 API 直调网关（同图同 prompt），Qwen3.8-27B 完美描述测试图（红气球/蓝天/白云/绿树冠，prompt_tokens=1097 含图 ≈900）→ 排除模型/网关因素，锁定请求装配层。
-
-修复：Tool 分支在结果含 Image 块时 content 改用 parts 数组（`text` + `image_url`），落实 L190 注释的本意；纯文本结果保持字符串形态。测试：`llm_tests.rs`（含图 → parts 数组；纯文本 → 字符串）。
-
-### 8.2 图片估算口径导致大图必被卸载（已根治，2026-11-08）
-
-compaction E1.5（`compaction/prune.rs`）原按 **data URL 字符数/4** 估算图片 token，而 threshold = min(128K×0.8, 128K−2K−64K headroom) = **60,416 tok**——一张 1920×1920 JPEG（est ≈78K）在返回瞬间即被卸载为 `[image content removed to fit context window]`，**任何正常大小的截图在默认配置下都无法进入模型**。
-
-已对齐 ava `image_budget.rs` 已验证的两层方案根治（`onion/src/media.rs`）：
-
-- **层1 进上下文前预算**（`read_image` 工具返回前）：像素 >1.15MP → 长边 1568 + 面积比例缩放重编码（alpha 走 PNG / 其余 JPEG q85；重编码不小于原图则保留原图，失败降级不失败请求）；字节 >1MB → 压缩重编码；解码失败/损坏 → 文本占位。请求视图另以 `evict_old_images` 封顶历史图片 ≤4 张（kernel 装配先于 prune_view 应用）。transcript/state 原件不动。
-- **层2 估算封顶**（`compaction/estimate.rs::IMAGE_TOKEN_ESTIMATE = 2048`）：图片按预算后固定单图估算，不再按 data URL 字符数折算——估算面向预算后的请求视图而非原始字节。
-
-冒烟验证（2026-11-08）：1920×1920 PNG（3.69M px）经 `read_image` 进模型并被精确描述（红圆/绿方/蓝三角/文字 `AVA2-7391` 全对，step1.2 in=14562 含图仅 ≈2-4K），无 E1.5 卸载。
-
-### 8.3 冒烟结论
-
-修复 8.1 后实测通过：
-
-- 模型准确描述测试图全部要素：中央鲜红气球（视觉焦点）、晴朗蓝天渐变、左上角一小朵白云、底部一排绿色树冠；
-- usage 佐证图片真实进入视觉管线：读图步 in=11966 vs 无图步 in=9894（图片 ≈2K 视觉 token，符合 Qwen tile 计费）；
-- 顺带观察：E1.5 卸载后的 compaction 摘要管线报 `framed summary (513 tok) does not shrink the shadowed region (80 tok)` 后降级继续，进程不崩溃（此前一次 exit -1 崩溃未复现，疑偶发）；
-- 运维注意：PowerShell 5 发 REST 中文 body 必须 `-Body ([System.Text.Encoding]::UTF8.GetBytes($json))`，否则非 UTF-8 编码发送产生乱码。
+配套约束：`llm.rs` 的 `wire_message` 在 Tool 结果含 Image 块时 content 必须改用 parts 数组（`text` + `image_url`），纯文本结果保持字符串形态——否则图片在请求装配层被静默丢弃，模型会基于「成功但无内容」的工具结果编造描述。

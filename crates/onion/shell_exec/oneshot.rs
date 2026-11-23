@@ -67,7 +67,7 @@ impl OneshotExecutor {
 
     /// 同上，但可一次性覆盖 OS 沙箱级（`mode = None` 时取共享配置的当前值）。
     /// 供沙箱拒绝后的升级重放使用——不改写共享 preset，避免并发窗口与取消时
-    /// 的 fail-open（见 docs/solutions/tool-approval-workspace-write-fix-plan.md §5.1.4）。
+    /// 的 fail-open。
     pub async fn exec_with_mode(
         &self,
         dialect: ShellDialect,

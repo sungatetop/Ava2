@@ -36,7 +36,7 @@ ava2/
 ├── apps/               # 可插拔 App（chatapp / file-viewer / skills-manager ...）
 ├── packages/app-sdk/   # App 开发 SDK 类型
 ├── skills/             # ava2-app-dev 技能（App 开发指南与校验脚本）
-└── docs/               # 设计 / 方案 / 参考文档（入口 docs/index.md）
+└── docs/               # 架构设计与开发指南（入口 docs/index.md）
 ```
 
 ## 环境要求
