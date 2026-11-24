@@ -100,6 +100,15 @@ impl HubRepo {
         format!("{}/{}/{}/{}", self.raw_base, self.repo, self.branch, path)
     }
 
+    /// 单文件内容 API（返回 base64 编码的 JSON）。raw 域名在部分网络下不可达，
+    /// 内容 API 走 `api_base` 更稳定，作为下载的首选通道。
+    fn contents_url(&self, path: &str) -> String {
+        format!(
+            "{}/repos/{}/contents/{}?ref={}",
+            self.api_base, self.repo, path, self.branch
+        )
+    }
+
     fn authed(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         match &self.token {
             Some(token) => request.header("authorization", format!("Bearer {token}")),
@@ -239,13 +248,62 @@ async fn fetch_tree(client: &reqwest::Client, repo: &HubRepo) -> Result<HashSet<
         .collect())
 }
 
-/// 取单个文件文本（raw 通道，不计 API 限额）。
-async fn fetch_text(client: &reqwest::Client, url: &str) -> Option<String> {
-    let response = client.get(url).send().await.ok()?;
-    if !response.status().is_success() {
-        return None;
+/// 取单个文件文本（优先内容 API，回退 raw 通道）。
+async fn fetch_text(client: &reqwest::Client, repo: &HubRepo, path: &str) -> Option<String> {
+    let bytes = fetch_file_bytes(client, repo, path).await.ok()?;
+    String::from_utf8(bytes).ok()
+}
+
+/// 内容 API 响应（只取 base64 内容与编码标记）。
+#[derive(Deserialize)]
+struct ContentsResponse {
+    #[serde(default)]
+    content: String,
+    #[serde(default)]
+    encoding: String,
+}
+
+/// 下载单个文件字节：优先 GitHub 内容 API（走 `api_base`，在 raw 域名不可达的
+/// 网络下仍可用），失败或内容为空时回退 raw 通道。
+async fn fetch_file_bytes(
+    client: &reqwest::Client,
+    repo: &HubRepo,
+    path: &str,
+) -> Result<Vec<u8>, String> {
+    let response = repo
+        .authed(client.get(repo.contents_url(path)))
+        .send()
+        .await
+        .map_err(|e| format!("内容 API 请求失败: {e}"))?;
+    if response.status().is_success() {
+        if let Ok(payload) = response.json::<ContentsResponse>().await {
+            if payload.encoding == "base64" && !payload.content.is_empty() {
+                let compact: String = payload
+                    .content
+                    .chars()
+                    .filter(|c| !c.is_whitespace())
+                    .collect();
+                use base64::Engine as _;
+                if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(compact) {
+                    return Ok(bytes);
+                }
+            }
+        }
     }
-    response.text().await.ok()
+    // 回退 raw 通道（大文件内容 API 不内联时走这里）
+    let response = client
+        .get(repo.raw_url(path))
+        .send()
+        .await
+        .map_err(|e| format!("raw 下载失败: {e}"))?;
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status().as_u16()));
+    }
+    response
+        .bytes()
+        .await
+        .map(|bytes| bytes.to_vec())
+        .map_err(|e| format!("读取响应失败: {e}"))
 }
 
 /// 从文件树里收集 `apps/<id>/` 下的全部文件（相对 App 根）。
@@ -318,8 +376,7 @@ pub(crate) async fn list(
         .unwrap_or_default();
     let mut apps = Vec::new();
     for (dir, base) in candidates {
-        let Some(raw) = fetch_text(&client, &repo.raw_url(&format!("{base}manifest.json"))).await
-        else {
+        let Some(raw) = fetch_text(&client, &repo, &format!("{base}manifest.json")).await else {
             continue;
         };
         let Ok(manifest) = serde_json::from_str::<Value>(&raw) else {
@@ -383,21 +440,9 @@ async fn download_app_files(
     let client = HubRepo::client(FILE_TIMEOUT)?;
     let mut total = 0usize;
     for (relative, repo_path) in files {
-        let response = client
-            .get(repo.raw_url(repo_path))
-            .send()
+        let bytes = fetch_file_bytes(&client, repo, repo_path)
             .await
             .map_err(|e| ApiError::internal(format!("下载 {repo_path} 失败: {e}")))?;
-        if !response.status().is_success() {
-            return Err(ApiError::internal(format!(
-                "下载 {repo_path} 失败：HTTP {}",
-                response.status().as_u16()
-            )));
-        }
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|e| ApiError::internal(format!("读取 {repo_path} 失败: {e}")))?;
         if bytes.len() > MAX_FILE_BYTES {
             return Err(ApiError::bad_request(
                 "app_hub_file_too_large",
