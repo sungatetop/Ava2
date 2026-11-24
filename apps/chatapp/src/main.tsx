@@ -27,7 +27,9 @@ export function setup(ctx: AppContext): { dispose(): void } {
     ctx.slots.inject("surface.main", {
       viewId: "chatapp",
       title: "对话",
-      component: async () => ({ default: () => <ChatView agent={ctx.agent} storage={ctx.storage} /> }),
+      component: async () => ({
+        default: () => <ChatView agent={ctx.agent} storage={ctx.storage} pickNative={ctx.desktop?.pickFolder} />,
+      }),
     }),
   ];
   return {

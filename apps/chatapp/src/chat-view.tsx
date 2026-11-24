@@ -34,6 +34,8 @@ import { downloadText, sessionToMarkdown } from "./export";
 interface ChatViewProps {
   agent: AgentChannel;
   storage: AppContext["storage"];
+  /** 原生系统文件夹选择器（桌面端 ctx.desktop.pickFolder；浏览器端缺省） */
+  pickNative?: () => Promise<string | null>;
 }
 
 function errText(e: unknown): string {
@@ -452,7 +454,7 @@ function ContextMeter({ tokens, limit }: { tokens: number; limit: number }) {
   );
 }
 
-export function ChatView({ agent, storage }: ChatViewProps) {
+export function ChatView({ agent, storage, pickNative }: ChatViewProps) {
   const [items, setItems] = useState<ChatItem[]>([]);
   const [pending, setPending] = useState<PendingCard[]>([]);
   const [input, setInput] = useState("");
@@ -1402,6 +1404,7 @@ export function ChatView({ agent, storage }: ChatViewProps) {
           agent={agent}
           startDir={info?.workingDir || info?.root || draftCwd}
           recent={workspaces}
+          native={pickNative}
           onCancel={() => setWsPicker(false)}
           onPick={(dir) => {
             setWsPicker(false);

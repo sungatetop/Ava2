@@ -22,6 +22,23 @@ fn backend_base(state: tauri::State<'_, Arc<Sidecar>>) -> String {
     format!("http://127.0.0.1:{}", state.port())
 }
 
+/// 原生「选择文件夹」系统对话框：宿主经 ctx.desktop.pickFolder 暴露给 App。
+/// 用户取消时返回 None → 前端收到 null。blocking 对话框放到独立线程，
+/// 不阻塞主事件循环。
+#[tauri::command]
+async fn pick_folder(app: tauri::AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+    tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .blocking_pick_folder()
+            .map(|path| path.to_string())
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let port = std::env::var("ONION_SERVER_PORT")
@@ -32,10 +49,12 @@ pub fn run() {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(sidecar.clone())
         .invoke_handler(tauri::generate_handler![
             backend_base,
+            pick_folder,
             update::check_update,
             update::install_update
         ])

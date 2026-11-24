@@ -20,6 +20,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
+# 原生文件夹选择对话框（App 经宿主 ctx.desktop.pickFolder 使用）
+tauri-plugin-dialog = "2"
 # 应用内更新（minisign 签名校验 + 下载安装），与 npm @tauri-apps/plugin-updater 对齐
 tauri-plugin-updater = "=2.11.0"
 serde = { version = "1", features = ["derive"] }

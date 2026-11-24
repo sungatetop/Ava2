@@ -27,6 +27,7 @@ import type {
 import { CLAIMING_SLOT_KEYS, SLOT_KEYS } from "./types";
 import { INJECT_KEYS } from "./manifest";
 import { getAgent, netFetch } from "./agent";
+import { isDesktop } from "./env";
 
 /** net.allow 域匹配：host 等于域或为域的子域（`api.skillhub.cn` 匹配
  *  `skillhub.cn`；域项忽略前导点）。 */
@@ -413,9 +414,25 @@ class Registry {
         return netFetch(input);
       },
     };
+    // 桌面能力桥：仅 Tauri 桌面端提供（浏览器端 undefined，App 须可选链消费）。
+    // 原生对话框由用户交互驱动，不属于特权能力面，无需按注出面收窄。
+    const desktop: AppContext["desktop"] | undefined = isDesktop()
+      ? {
+          pickFolder: async () => {
+            try {
+              const { invoke } = await import("@tauri-apps/api/core");
+              return await invoke<string | null>("pick_folder");
+            } catch (e) {
+              console.warn("[apphost] 原生选择文件夹失败：", e);
+              return null;
+            }
+          },
+        }
+      : undefined;
     return {
       manifest,
       pageId,
+      desktop,
       get slots() {
         if (!granted.has("slots")) deny("slots");
         return slotsApi;

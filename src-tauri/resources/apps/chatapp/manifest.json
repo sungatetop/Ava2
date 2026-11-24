@@ -1,7 +1,7 @@
 {
   "id": "chatapp",
   "name": "对话",
-  "version": "0.9.7",
+  "version": "0.10.5",
   "description": "与智能体多轮对话：写作、编程、工具调用，交付物一键在画布打开。",
   "author": "Ava Team",
   "homepage": "https://github.com/sungatetop/Ava2",

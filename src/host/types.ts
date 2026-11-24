@@ -774,6 +774,12 @@ export interface AppContext {
    *  应用市场详情页随之出现「设置」入口，点击弹层惰性挂载面板组件。
    *  纯声明，不占能力面；宿主不做任何配置存储/校验/回显处理。 */
   registerSettingsPanel(factory: SettingsPanelFactory): void;
+  /** 桌面能力桥（可选）：仅 Tauri 桌面端提供，浏览器端为 undefined。
+   *  App 须以 `ctx.desktop?.` 可选链消费，保证双端同构。 */
+  readonly desktop?: {
+    /** 原生「选择文件夹」系统对话框；用户取消时返回 null */
+    pickFolder(): Promise<string | null>;
+  };
 }
 
 /** App ESM 入口契约：export function setup(ctx): Disposable | void */

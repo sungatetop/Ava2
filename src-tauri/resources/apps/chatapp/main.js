@@ -127,7 +127,7 @@ var settings_exports = {};
 __export(settings_exports, {
   default: () => SettingsPanel
 });
-import { useState as useState8 } from "react";
+import { useState as useState9 } from "react";
 import { jsx as jsx9, jsxs as jsxs8 } from "react/jsx-runtime";
 function readConfig() {
   try {
@@ -137,7 +137,7 @@ function readConfig() {
   }
 }
 function SettingsPanel() {
-  const [cfg, setCfg] = useState8(readConfig);
+  const [cfg, setCfg] = useState9(readConfig);
   const save = (patch2) => {
     const next = { ...readConfig(), ...patch2 };
     localStorage.setItem(CFG_KEY, JSON.stringify(next));
@@ -207,7 +207,7 @@ function openInCanvas(path2, sessionId) {
 }
 
 // src/chat-view.tsx
-import { Fragment as Fragment5, useEffect as useEffect5, useRef as useRef4, useState as useState6 } from "react";
+import { Fragment as Fragment6, useEffect as useEffect6, useRef as useRef5, useState as useState7 } from "react";
 
 // src/composer-chips.tsx
 import { useEffect as useEffect2, useRef as useRef2, useState as useState2 } from "react";
@@ -626,6 +626,11 @@ function textBlocks(message) {
   const blocks = Array.isArray(m?.blocks) ? m.blocks : [];
   return blocks.map((b) => asRecord(b)?.type === "text" ? asString(asRecord(b)?.text) : "").join("");
 }
+function thinkingBlocks(message) {
+  const m = asRecord(message);
+  const blocks = Array.isArray(m?.blocks) ? m.blocks : [];
+  return blocks.map((b) => asRecord(b)?.type === "thinking" ? asString(asRecord(b)?.thinking) : "").filter((text7) => text7 !== "");
+}
 function imageBlocks(message) {
   const m = asRecord(message);
   const blocks = Array.isArray(m?.blocks) ? m.blocks : [];
@@ -691,7 +696,15 @@ function openTurn(items, turn) {
     }
     return items;
   }
-  const fresh = { kind: "turn", turn, thinking: "", steps: [], answer: "", streaming: true };
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (isTurn(it) && it.streaming && (it.turn === turn || it.turn === -1)) {
+      const patched = it.turn === -1 && turn !== -1 ? { ...it, turn } : it;
+      return [...items.slice(0, i), patched, ...items.slice(i + 1)];
+    }
+    if (isTurn(it) && !it.streaming && it.turn !== -1 && it.turn !== turn) break;
+  }
+  const fresh = { kind: "turn", turn, thinkingSegs: [], steps: [], answer: "", streaming: true };
   return [...items, fresh];
 }
 function withLastTurn(items, patch2) {
@@ -699,10 +712,31 @@ function withLastTurn(items, patch2) {
   if (!last || !isTurn(last)) return items;
   return [...items.slice(0, -1), patch2(last)];
 }
-function streamingTurn(items) {
-  const last = items[items.length - 1];
-  if (last && isTurn(last) && last.streaming) return items;
-  return openTurn(items, -1);
+function mergeAnswer(current, incoming) {
+  if (!incoming) return current;
+  return current.endsWith(incoming) ? current : current + incoming;
+}
+function mergeThinkingSegs(turn, blocks) {
+  if (blocks.length === 0) return turn.thinkingSegs;
+  let segs = turn.thinkingSegs;
+  for (const block of blocks) {
+    if (segs.length === turn.steps.length + 1) {
+      segs = [...segs.slice(0, -1), block];
+    } else if (segs[segs.length - 1] !== block) {
+      segs = [...segs, block];
+    }
+  }
+  return segs;
+}
+function withStreamingTurn(items, patch2) {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (isTurn(it) && it.streaming) {
+      return [...items.slice(0, i), patch2(it), ...items.slice(i + 1)];
+    }
+  }
+  const fresh = { kind: "turn", turn: -1, thinkingSegs: [], steps: [], answer: "", streaming: true };
+  return [...items, fresh];
 }
 function todosFromEvent(raw) {
   const ev = asRecord(raw);
@@ -739,9 +773,12 @@ function applyDurable(items, raw) {
         }
         if (it.kind === "turn" && !it.streaming && it.turn !== -1) break;
       }
-      const last = items[items.length - 1];
-      if (last && isTurn(last) && last.streaming) {
-        return [...items.slice(0, -1), settled, last];
+      for (let i = items.length - 1; i >= 0; i--) {
+        const it = items[i];
+        if (isTurn(it) && it.streaming) {
+          return [...items.slice(0, i), settled, ...items.slice(i)];
+        }
+        if (isTurn(it) && !it.streaming && it.turn !== -1) break;
       }
       return [...items, settled];
     }
@@ -750,7 +787,7 @@ function applyDurable(items, raw) {
       if (!call) return items;
       const id = asString(call.id);
       const inputText = asString(call.input);
-      return withLastTurn(openTurn(items, asNumber(ev.turn)), (t) => {
+      return withStreamingTurn(openTurn(items, asNumber(ev.turn)), (t) => {
         if (id !== "" && t.steps.some((s) => s.id === id)) {
           return {
             ...t,
@@ -774,7 +811,7 @@ function applyDurable(items, raw) {
       const callId = asString(result.tool_call_id);
       const isError = result.is_error === true;
       const resultText = contentText(result.content);
-      return withLastTurn(items, (t) => ({
+      return withStreamingTurn(items, (t) => ({
         ...t,
         steps: t.steps.map(
           (s) => s.id === callId ? { ...s, running: false, isError, resultText } : s
@@ -784,19 +821,40 @@ function applyDurable(items, raw) {
     case "assistant_message": {
       const text7 = textBlocks(ev.message);
       const stepUsage = turnUsage(ev.usage);
-      return withLastTurn(openTurn(items, asNumber(ev.turn)), (t) => ({
+      return withStreamingTurn(openTurn(items, asNumber(ev.turn)), (t) => ({
         ...t,
-        answer: text7 || t.answer,
-        usage: sumUsage(t.usage, stepUsage)
+        // live 流式累加、durable echo 后缀幂等跳过（回放态逐步累加，中间步
+        // 文本不再被末步覆盖——与 live 口径一致）
+        answer: mergeAnswer(t.answer, text7),
+        usage: sumUsage(t.usage, stepUsage),
+        // 落定消息携带本步思考块（onion final_blocks）：见 mergeThinkingSegs
+        thinkingSegs: mergeThinkingSegs(t, thinkingBlocks(ev.message))
       }));
     }
     case "assistant_attempt": {
       const error = asString(ev.error);
       if (!error) return items;
-      return withLastTurn(items, (t) => ({ ...t, retryText: error }));
+      return withStreamingTurn(items, (t) => ({ ...t, retryText: error }));
     }
-    case "turn_end":
-      return withLastTurn(items, (t) => ({ ...t, streaming: false }));
+    case "turn_end": {
+      const anyStreaming = items.some((it) => isTurn(it) && it.streaming);
+      if (!anyStreaming) return items;
+      const reason = asString(ev.reason);
+      return items.map((it) => {
+        if (!isTurn(it) || !it.streaming) return it;
+        return {
+          ...it,
+          streaming: false,
+          report: {
+            turn: it.turn,
+            steps: it.steps.length,
+            reason,
+            // turn_report 帧可能先行（其 usage 为权威汇总）；durable echo 补写时保留
+            usage: it.usage ?? it.report?.usage
+          }
+        };
+      });
+    }
     // ---- 斜杠命令（command_run + command_done 帧） ----
     case "command_run": {
       const id = asString(ev.command_id);
@@ -875,10 +933,15 @@ function applyLive(items, raw) {
   const start2 = asRecord(chunk.ToolCallStart);
   const input2 = asRecord(chunk.ToolCallInput);
   if (text7) {
-    return withLastTurn(streamingTurn(items), (t) => ({ ...t, answer: t.answer + text7 }));
+    return withStreamingTurn(items, (t) => ({ ...t, answer: t.answer + text7 }));
   }
   if (thinking) {
-    return withLastTurn(streamingTurn(items), (t) => ({ ...t, thinking: t.thinking + thinking }));
+    return withStreamingTurn(items, (t) => {
+      const segs = t.thinkingSegs;
+      const last = segs.length - 1;
+      const next = segs.length === t.steps.length + 1 ? [...segs.slice(0, last), segs[last] + thinking] : [...segs, thinking];
+      return { ...t, thinkingSegs: next };
+    });
   }
   if (start2) {
     const step = {
@@ -887,7 +950,7 @@ function applyLive(items, raw) {
       inputText: "",
       running: true
     };
-    return withLastTurn(streamingTurn(items), (t) => ({
+    return withStreamingTurn(items, (t) => ({
       ...t,
       steps: t.steps.some((s) => s.id === step.id && step.id !== "") ? t.steps : [...t.steps, step]
     }));
@@ -895,7 +958,7 @@ function applyLive(items, raw) {
   if (input2) {
     const index3 = asNumber(input2.index);
     const partial = asString(input2.partial_json);
-    return withLastTurn(items, (t) => ({
+    return withStreamingTurn(items, (t) => ({
       ...t,
       steps: t.steps.map((s, i) => i === index3 ? { ...s, inputText: s.inputText + partial } : s)
     }));
@@ -903,7 +966,16 @@ function applyLive(items, raw) {
   return items;
 }
 function framesToItems(events) {
-  return events.reduce(applyDurable, []);
+  const items = events.reduce(applyDurable, []);
+  return items.map((it) => {
+    if (!isTurn(it) || !it.steps.some((s) => s.running)) return it;
+    return {
+      ...it,
+      steps: it.steps.map(
+        (s) => s.running ? { ...s, running: false, isError: true, resultText: s.resultText || "[\u4F1A\u8BDD\u4E2D\u65AD\uFF0C\u65E0\u8FD4\u56DE]" } : s
+      )
+    };
+  });
 }
 function applyFrame(items, frame) {
   switch (frame.type) {
@@ -959,7 +1031,7 @@ function turnUsageOf(item) {
 }
 
 // src/items.tsx
-import { useState as useState4 } from "react";
+import { Fragment as Fragment3, useState as useState4 } from "react";
 
 // node_modules/devlop/lib/default.js
 function ok() {
@@ -14583,7 +14655,7 @@ function remarkGfm(options) {
 }
 
 // src/items.tsx
-import { Fragment as Fragment3, jsx as jsx4, jsxs as jsxs3 } from "react/jsx-runtime";
+import { Fragment as Fragment4, jsx as jsx4, jsxs as jsxs3 } from "react/jsx-runtime";
 var ICON = {
   // 用向下 chevron 表示收起，展开时旋转 180°。
   chevron: "M6 9l6 6 6-6",
@@ -14723,7 +14795,7 @@ function ToolRow({ step }) {
         children: [
           /* @__PURE__ */ jsx4(StateDot, { step }),
           /* @__PURE__ */ jsx4("span", { className: "cc-tool-name", children: toolLabel(step.name) }),
-          summary && /* @__PURE__ */ jsxs3(Fragment3, { children: [
+          summary && /* @__PURE__ */ jsxs3(Fragment4, { children: [
             /* @__PURE__ */ jsx4("span", { className: "cc-tool-sep", "aria-hidden": "true" }),
             /* @__PURE__ */ jsx4("span", { className: "cc-row-summary" + (step.isError ? " err" : ""), children: summary }),
             todo && todo.extra > 0 && /* @__PURE__ */ jsxs3("span", { className: "cc-tool-extra", children: [
@@ -14772,15 +14844,39 @@ function Deliverables({ files, sessionId }) {
     )
   ] }, file.path)) });
 }
+function firstLineOf(text7) {
+  const newline = text7.indexOf("\n");
+  return newline === -1 ? text7 : text7.slice(0, newline);
+}
+function latestParagraphFirstLine(text7) {
+  let summary = "";
+  let paragraphStart = 0;
+  const separator = /\r?\n(?:[\t ]*\r?\n)+/g;
+  while (true) {
+    const nextParagraph = separator.exec(text7);
+    const paragraphEnd = nextParagraph === null ? text7.length : nextParagraph.index + nextParagraph[0].indexOf("\n");
+    const newline = text7.indexOf("\n", paragraphStart);
+    if (newline !== -1 && newline <= paragraphEnd) {
+      const candidate = text7.slice(paragraphStart, newline).trim();
+      if (candidate !== "") summary = candidate;
+    }
+    if (nextParagraph === null) return summary;
+    paragraphStart = nextParagraph.index + nextParagraph[0].length;
+  }
+}
 function ReasoningRow({ thinking, live }) {
   const [open, setOpen] = useState4(false);
-  return /* @__PURE__ */ jsxs3(Fragment3, { children: [
+  const summary = (live && !open ? latestParagraphFirstLine(thinking) : firstLineOf(thinking)).replaceAll(
+    "**",
+    ""
+  );
+  return /* @__PURE__ */ jsxs3(Fragment4, { children: [
     /* @__PURE__ */ jsxs3("button", { className: "cc-row", "aria-expanded": open, onClick: () => setOpen((v) => !v), children: [
       /* @__PURE__ */ jsx4("span", { className: "cc-chevron" + (open ? " open" : ""), children: /* @__PURE__ */ jsx4(Icon, { d: ICON.chevron }) }),
       /* @__PURE__ */ jsx4("span", { className: "cc-tool-name", children: live ? "\u601D\u8003\u4E2D" : "\u601D\u8003" }),
-      !open && /* @__PURE__ */ jsx4("span", { className: "cc-row-summary", children: firstLine(thinking, 90) })
+      !open && /* @__PURE__ */ jsx4("span", { className: "cc-row-summary" + (live ? " cc-shimmer" : ""), children: summary })
     ] }),
-    open && /* @__PURE__ */ jsx4("div", { className: "cc-thinking", children: thinking })
+    open && /* @__PURE__ */ jsx4("div", { className: "cc-thinking", children: /* @__PURE__ */ jsx4(Markdown2, { text: thinking }) })
   ] });
 }
 function ProcessBlock({ item }) {
@@ -14793,7 +14889,9 @@ function ProcessBlock({ item }) {
     steps > 0 ? `${steps} \u6B65` : "",
     reason === "cancelled" ? "" : reason
   ].filter(Boolean).join(" \xB7 ");
-  const empty3 = !item.thinking && steps === 0;
+  const hasThinking = item.thinkingSegs.some((s) => s.trim() !== "");
+  const empty3 = !hasThinking && steps === 0;
+  const tailSeg = item.thinkingSegs[steps] ?? "";
   return /* @__PURE__ */ jsxs3("div", { children: [
     /* @__PURE__ */ jsxs3(
       "button",
@@ -14809,8 +14907,14 @@ function ProcessBlock({ item }) {
       }
     ),
     open && /* @__PURE__ */ jsxs3("div", { className: "cc-process-body", children: [
-      item.thinking && /* @__PURE__ */ jsx4(ReasoningRow, { thinking: item.thinking, live: live && !item.answer }),
-      item.steps.map((s) => /* @__PURE__ */ jsx4(ToolRow, { step: s }, s.id || s.name))
+      item.steps.map((s, i) => {
+        const seg = item.thinkingSegs[i] ?? "";
+        return /* @__PURE__ */ jsxs3(Fragment3, { children: [
+          seg.trim() !== "" && /* @__PURE__ */ jsx4(ReasoningRow, { thinking: seg, live: false }),
+          /* @__PURE__ */ jsx4(ToolRow, { step: s })
+        ] }, s.id || `${i}-${s.name}`);
+      }),
+      tailSeg.trim() !== "" && /* @__PURE__ */ jsx4(ReasoningRow, { thinking: tailSeg, live: live && !item.answer })
     ] })
   ] });
 }
@@ -14820,7 +14924,7 @@ function UsagePill({ usage }) {
   const total = usageTotal(usage);
   const uncached = Math.max(0, usage.inputTokens - usage.cacheReadTokens - usage.cacheWriteTokens);
   const cacheHit = formatCacheHitPercent(usage.cacheReadTokens, usage.inputTokens);
-  return /* @__PURE__ */ jsxs3(Fragment3, { children: [
+  return /* @__PURE__ */ jsxs3(Fragment4, { children: [
     /* @__PURE__ */ jsxs3(
       "button",
       {
@@ -14849,7 +14953,7 @@ function UsagePill({ usage }) {
       ] }),
       /* @__PURE__ */ jsx4("div", { className: "cc-usage-pop-rule", "aria-hidden": true }),
       /* @__PURE__ */ jsxs3("dl", { className: "cc-usage-pop-details", children: [
-        cacheHit !== null && /* @__PURE__ */ jsxs3(Fragment3, { children: [
+        cacheHit !== null && /* @__PURE__ */ jsxs3(Fragment4, { children: [
           /* @__PURE__ */ jsx4("dt", { children: "\u7F13\u5B58\u547D\u4E2D" }),
           /* @__PURE__ */ jsxs3("dd", { children: [
             cacheHit,
@@ -14858,11 +14962,11 @@ function UsagePill({ usage }) {
         ] }),
         /* @__PURE__ */ jsx4("dt", { children: "\u672A\u7F13\u5B58\u8F93\u5165" }),
         /* @__PURE__ */ jsx4("dd", { children: formatExactTokens(uncached) }),
-        usage.cacheReadTokens > 0 && /* @__PURE__ */ jsxs3(Fragment3, { children: [
+        usage.cacheReadTokens > 0 && /* @__PURE__ */ jsxs3(Fragment4, { children: [
           /* @__PURE__ */ jsx4("dt", { children: "\u7F13\u5B58\u8BFB\u53D6" }),
           /* @__PURE__ */ jsx4("dd", { children: formatExactTokens(usage.cacheReadTokens) })
         ] }),
-        usage.cacheWriteTokens > 0 && /* @__PURE__ */ jsxs3(Fragment3, { children: [
+        usage.cacheWriteTokens > 0 && /* @__PURE__ */ jsxs3(Fragment4, { children: [
           /* @__PURE__ */ jsx4("dt", { children: "\u7F13\u5B58\u5199\u5165" }),
           /* @__PURE__ */ jsx4("dd", { children: formatExactTokens(usage.cacheWriteTokens) })
         ] }),
@@ -14880,7 +14984,7 @@ function AssistantTurn({
   const [copied, copy] = useCopy();
   const usage = turnUsageOf(item);
   const tokens = usageTotal(usage);
-  const hasProcess = Boolean(item.thinking) || item.steps.length > 0 || tokens > 0;
+  const hasProcess = item.thinkingSegs.some((s) => s.trim() !== "") || item.steps.length > 0 || tokens > 0;
   const deliverables = presentedOf(item);
   return /* @__PURE__ */ jsxs3("div", { className: "cc-assistant", id, children: [
     item.retryText && /* @__PURE__ */ jsxs3("div", { className: "cc-note", children: [
@@ -14989,7 +15093,7 @@ function CompactionView({ item }) {
   ] });
 }
 function ChatItems({ items, sessionId }) {
-  return /* @__PURE__ */ jsx4(Fragment3, { children: items.map(
+  return /* @__PURE__ */ jsx4(Fragment4, { children: items.map(
     (item, i) => item.kind === "user" ? /* @__PURE__ */ jsx4(
       UserBubble,
       {
@@ -15226,11 +15330,45 @@ var chatappCss = `
   flex: none;
 }
 
-.cc-head-title {
-  font-size: 15px;
-  line-height: 24px;
-  font-weight: 500;
+/* \u4E2D\u680F\u89C6\u56FE\u5206\u6BB5 tab\uFF08\u5BF9\u8BDD / \u8F68\u8FF9\uFF09\uFF1A\u5206\u6BB5\u63A7\u4EF6\u5F0F\uFF0C\u6FC0\u6D3B\u5E95 + \u4E3B\u6587\u672C\u8272 */
+.cc-viewtabs {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  height: 30px;
+  padding: 2px;
+  border: 0.5px solid var(--cc-l2);
+  border-radius: var(--ava-radius-sm, 10px);
+  background: color-mix(in srgb, var(--cc-t1) 4%, var(--ava-bg-layer-1, #ffffff));
+}
+
+.cc-viewtab {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 var(--ava-space-3, 12px);
+  border: none;
+  border-radius: calc(var(--ava-radius-sm, 10px) - 2px);
+  background: transparent;
+  color: var(--cc-t2);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
   white-space: nowrap;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.cc-viewtab:hover {
+  background: var(--cc-hover);
+  color: var(--cc-t1);
+}
+
+.cc-viewtab.on {
+  background: var(--ava-nav-active, var(--cc-hover));
+  color: var(--cc-t1);
+  font-weight: 500;
 }
 
 .cc-head-dim {
@@ -15241,33 +15379,13 @@ var chatappCss = `
   white-space: nowrap;
 }
 
-/* \u5934\u90E8\u53F3\u7AEF\uFF1A\u751F\u6210\u72B6\u6001 + \u4E0A\u4E0B\u6587\u5360\u6BD4 + \u8F68\u8FF9\u5F00\u5173 */
+/* \u5934\u90E8\u53F3\u7AEF\uFF1A\u751F\u6210\u72B6\u6001 + \u4E0A\u4E0B\u6587\u5360\u6BD4 */
 .cc-head-right {
   display: flex;
   align-items: center;
   gap: var(--ava-space-3, 10px);
   margin-left: auto;
   min-width: 0;
-}
-
-.cc-head-btn {
-  flex: none;
-  height: 26px;
-  padding: 0 var(--ava-space-3, 10px);
-  border: 0.5px solid var(--cc-l2);
-  border-radius: var(--ava-radius-pill, 999px);
-  background: transparent;
-  color: var(--cc-t2);
-  font: inherit;
-  font-size: 12px;
-  line-height: 18px;
-  cursor: pointer;
-}
-
-.cc-head-btn:hover,
-.cc-head-btn.on {
-  background: var(--cc-hover);
-  color: var(--cc-t1);
 }
 
 /* \u4E0A\u4E0B\u6587\u5360\u6BD4\uFF1A4px \u8FDB\u5EA6\u6761 + \u4F30\u7B97\u6570\u503C\uFF08\u226570% \u8B66\u544A\u3001\u226590% \u5371\u9669\uFF09 */
@@ -15531,6 +15649,34 @@ var chatappCss = `
   padding-top: var(--ava-space-4, 16px);
 }
 
+/* \u300C\u6D4F\u89C8\u7CFB\u7EDF\u76EE\u5F55\u2026\u300D\uFF1A\u5DE6\u5BF9\u9F50\u7684\u6B21\u7EA7\u5165\u53E3\uFF08\u5524\u8D77 OS \u539F\u751F\u6587\u4EF6\u5939\u9009\u62E9\u5668\uFF09 */
+.cc-picker-native {
+  height: 30px;
+  padding: 0 var(--ava-space-4, 16px);
+  border: 0.5px solid var(--cc-l2);
+  border-radius: var(--ava-radius-pill, 999px);
+  background: transparent;
+  color: var(--cc-t2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cc-picker-native:hover:not(:disabled) {
+  background: var(--cc-hover);
+  color: var(--cc-t1);
+}
+
+.cc-picker-native:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* \u5360\u4F4D\uFF1A\u628A\u53D6\u6D88/\u4F7F\u7528\u6B64\u76EE\u5F55\u63A8\u5230\u53F3\u4FA7\uFF0C\u6D4F\u89C8\u7CFB\u7EDF\u76EE\u5F55\u7559\u5728\u5DE6\u4FA7 */
+.cc-picker-foot-gap {
+  flex: 1;
+}
+
 .cc-picker-ok {
   height: 30px;
   padding: 0 var(--ava-space-4, 16px);
@@ -15760,6 +15906,30 @@ var chatappCss = `
   white-space: nowrap;
 }
 
+/* \u6D41\u5F0F\u6458\u8981\u5FAE\u5149\uFF08dsh TextShimmer \u5BF9\u9F50\uFF09\uFF1A\u6587\u5B57\u6E10\u53D8\u5F80\u590D\u626B\u8FC7 */
+.cc-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--cc-t3) 0%,
+    var(--cc-t1) 45%,
+    var(--cc-t3) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: cc-shimmer 1.6s linear infinite;
+}
+
+@keyframes cc-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
 .cc-row-summary.err {
   color: var(--cc-danger);
 }
@@ -15772,13 +15942,13 @@ var chatappCss = `
   font-variant-numeric: tabular-nums;
 }
 
+/* \u601D\u8003\u5C55\u5F00\u6B63\u6587\uFF1Amarkdown \u6B21\u7EA7\u6392\u7248\uFF08dsh \u5BF9\u9F50\u2014\u2014\u4E0D\u518D\u7528 pre-wrap\uFF0C\u7531 cc-md \u63A5\u7BA1\uFF09 */
 .cc-thinking {
   margin: var(--ava-space-0, 2px) 0 var(--ava-space-2, 8px);
   padding-left: var(--ava-space-5, 24px);
   color: var(--cc-t3);
   font-size: 13px;
   line-height: 20px;
-  white-space: pre-wrap;
   word-break: break-word;
 }
 
@@ -16755,267 +16925,445 @@ var chatappCss = `
   line-height: 18px;
 }
 
-/* \u2500\u2500 \u4F1A\u8BDD\u8F68\u8FF9\u89C6\u56FE\uFF08\u53F3\u4FA7\u9762\u677F\uFF1A\u7C98\u6027\u8F6E\u5934 + \u5361\u7247\u884C + \u7C7B\u522B\u8272\u6807\uFF09 \u2500\u2500
-   \u8272\u6807\u8BED\u4E49\uFF1A\u7528\u6237=success\u3001\u6D88\u606F=brand\xD7error \u6DF7\u5408\u7D2B\u3001\u5DE5\u5177=warn\u3001\u601D\u8003=\u4E2D\u6027\u3002 */
-.cc-traj {
+/* \u2500\u2500 \u4F1A\u8BDD\u8F68\u8FF9\u89C6\u56FE\uFF08\u72EC\u7ACB tab\uFF1A\u5DE5\u5177\u680F + \u6CF3\u9053\u6982\u89C8 + \u56DE\u5408\u5206\u7EC4\u8BB0\u5F55\u8868\uFF09 \u2500\u2500
+   \u8272\u6807\u8BED\u4E49\uFF08\u5BF9\u9F50 ava_square\uFF09\uFF1A\u7528\u6237=\u4E2D\u7070\u3001\u6D88\u606F=\u84DD\u3001\u601D\u8003=\u6D45\u84DD\u3001\u5DE5\u5177=\u9752\u3001
+   \u4E0A\u4E0B\u6587/\u7CFB\u7EDF=\u4E2D\u6027\u7070\u3001\u9519\u8BEF=\u7EA2\u3002 */
+.cc-trj-root {
   /* \u672C\u5730\u522B\u540D \u2192 \u5BBF\u4E3B\u4EE4\u724C\u6D3E\u751F\uFF08color-mix \u968F\u4EAE/\u6697\u4E3B\u9898\u81EA\u52A8\u5207\u6362\uFF09 */
-  --cc-traj-card: color-mix(in srgb, var(--cc-t1) 3.5%, var(--ava-bg-layer-1, #ffffff));
-  --cc-traj-line: color-mix(in srgb, var(--cc-t1) 8%, var(--ava-bg-layer-1, #ffffff));
-  --cc-traj-head-fill: color-mix(in srgb, var(--cc-t1) 4%, var(--ava-bg-layer-1, #ffffff));
-  --cc-traj-accent: color-mix(in srgb, var(--cc-blue) 22%, var(--ava-bg-layer-1, #ffffff));
-  --cc-traj-msg-ink: color-mix(
-    in srgb,
-    var(--cc-blue) 60%,
-    color-mix(in srgb, var(--cc-danger) 60%, var(--ava-bg-layer-1, #ffffff)) 40%
-  );
+  --cc-trj-accent: color-mix(in srgb, var(--cc-blue) 22%, var(--ava-bg-layer-1, #ffffff));
 
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 30;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  width: min(360px, 88%);
-  border-left: 0.5px solid var(--cc-l2);
   background: var(--ava-bg-layer-1, #ffffff);
-  box-shadow: var(--ava-shadow-panel, 0 8px 24px rgba(0, 0, 0, 0.08));
   color: var(--cc-t1);
   font-size: 12px;
   line-height: 18px;
 }
 
-.cc-traj-head {
+/* \u5DE5\u5177\u680F\uFF1A\u641C\u7D22 + \u8BB0\u5F55\u6570 + \u6298\u53E0\u5168\u90E8 */
+.cc-trj-toolbar {
   display: flex;
   align-items: center;
   gap: var(--ava-space-2, 8px);
   flex: none;
-  height: 44px;
-  padding: 0 var(--ava-space-2, 8px) 0 var(--ava-space-3, 12px);
-  border-bottom: 0.5px solid var(--cc-l2);
+  height: 40px;
+  padding: 0 var(--ava-space-4, 16px);
+  border-bottom: 0.5px solid var(--cc-l3);
 }
 
-.cc-traj-title {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+/* \u641C\u7D22\u6846\uFF1A\u56FE\u6807\u5185\u5D4C\uFF08ava_square Search \u56FE\u6807\u540C\u4F4D\uFF09 */
+.cc-trj-searchbox {
+  position: relative;
+  flex: none;
+  width: 224px;
 }
 
-.cc-traj-sum {
-  margin-left: auto;
+.cc-trj-searchbox svg {
+  position: absolute;
+  left: 10px;
+  top: 50%;
   color: var(--cc-t3);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.cc-trj-searchbox input {
+  width: 100%;
+  height: 26px;
+  padding: 0 var(--ava-space-2, 8px) 0 28px;
+  border: 0.5px solid var(--cc-l2);
+  border-radius: var(--ava-radius-xs, 4px);
+  background: var(--cc-btn-fill, #ffffff);
+  color: var(--cc-t1);
+  font: inherit;
   font-size: 12px;
   line-height: 18px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  outline: none;
 }
 
-.cc-traj-x {
-  display: grid;
-  place-items: center;
+.cc-trj-searchbox input:focus {
+  border-color: color-mix(in srgb, var(--cc-blue) 40%, var(--cc-l2));
+}
+
+.cc-trj-count {
   flex: none;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  border-radius: var(--ava-radius-sm, 10px);
+  color: var(--cc-t3);
+  font-variant-numeric: tabular-nums;
+}
+
+.cc-trj-toggleall {
+  flex: none;
+  height: 24px;
+  margin-left: auto;
+  padding: 0 var(--ava-space-2, 8px);
+  border: 0.5px solid var(--cc-l2);
+  border-radius: var(--ava-radius-xs, 4px);
   background: transparent;
   color: var(--cc-t2);
   font: inherit;
-  font-size: 16px;
-  line-height: 18px;
+  font-size: 11px;
+  line-height: 1;
   cursor: pointer;
 }
 
-.cc-traj-x:hover {
+.cc-trj-toggleall:hover {
   background: var(--cc-hover);
   color: var(--cc-t1);
 }
 
-.cc-traj-list {
+/* \u4E09\u6CF3\u9053\u6982\u89C8\uFF08\u5E8F\u5217\u6A21\u5F0F\uFF09\uFF1A\u7EDF\u8BA1\u884C + \u5DE6\u6807\u7B7E\u5217 + \u53F3\u8F68\u9053\u5217\uFF1B
+   \u5757\u4F4D\u7F6E = (index-1)/span \u7B49\u5BBD\u6392\u5E03\uFF0C\u4E0D\u8868\u8FBE\u65F6\u957F\uFF08\xA79.3\uFF09\u3002 */
+.cc-trj-timeline {
+  flex: none;
+  padding: var(--ava-space-2, 8px) var(--ava-space-3, 12px);
+  border-bottom: 0.5px solid var(--cc-l3);
+}
+
+.cc-trj-statline {
+  margin: 0 0 6px;
+  color: var(--cc-t3);
+  font-size: 11px;
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cc-trj-lanes {
+  display: flex;
+  gap: var(--ava-space-2, 8px);
+}
+
+.cc-trj-lane-labels {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  width: 32px;
+  text-align: right;
+  user-select: none;
+}
+
+.cc-trj-lane-label {
+  color: var(--cc-t3);
+  font-size: 10px;
+  line-height: 10px;
+}
+
+.cc-trj-lane-tracks {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cc-trj-lane-track {
+  position: relative;
+  height: 10px;
+}
+
+.cc-trj-block {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 3px;
+  border: none;
+  border-radius: 2px;
+  padding: 0;
+  background: var(--cc-l3);
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 150ms ease;
+}
+
+.cc-trj-block:hover {
+  opacity: 1;
+}
+
+/* \u8272\u6807\u8BED\u4E49\uFF08\u5BF9\u9F50 ava_square\uFF09\uFF1A\u7528\u6237=\u4E2D\u7070\u3001\u6D88\u606F=\u84DD\u3001\u601D\u8003=\u6D45\u84DD\u3001
+   \u5DE5\u5177=\u9752\uFF08blue\xD7success \u6DF7\u8272\uFF09\u3001\u4E0A\u4E0B\u6587=\u6D45\u7070\u3001\u7CFB\u7EDF=\u7070\u3001\u9519\u8BEF=\u7EA2 */
+.cc-trj-block.is-user {
+  background: color-mix(in srgb, var(--cc-t1) 45%, var(--ava-bg-layer-1, #ffffff));
+}
+
+.cc-trj-block.is-message {
+  background: var(--cc-blue);
+}
+
+.cc-trj-block.is-think {
+  background: color-mix(in srgb, var(--cc-blue) 30%, var(--ava-bg-layer-1, #ffffff));
+}
+
+.cc-trj-block.is-tool {
+  background: color-mix(in srgb, var(--cc-blue) 45%, var(--cc-success) 55%);
+}
+
+.cc-trj-block.is-context {
+  background: color-mix(in srgb, var(--cc-t1) 14%, var(--ava-bg-layer-1, #ffffff));
+}
+
+.cc-trj-block.is-system {
+  background: color-mix(in srgb, var(--cc-t1) 22%, var(--ava-bg-layer-1, #ffffff));
+}
+
+.cc-trj-block.is-error {
+  background: var(--cc-danger);
+}
+
+.cc-trj-block.on {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--cc-blue);
+  z-index: 1;
+}
+
+/* \u56DE\u5408\u5206\u7EC4\u8BB0\u5F55\u8868\uFF1A\u7C98\u6027\u8F6E\u5934 + \u8BB0\u5F55\u884C */
+.cc-trj-table {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding-bottom: var(--ava-space-4, 16px);
 }
 
-.cc-traj-sec {
+.cc-trj-turn {
   display: flex;
   flex-direction: column;
 }
 
-/* \u8F6E\u6B21\u7C98\u6027\u8F6E\u5934\uFF1A44px ghost \u586B\u5145 + 600 13px \u6807\u9898\uFF1B
-   \u8FDB\u884C\u4E2D\u5728\u5DE6\u7F18\u6E32\u67D3 2px \u8F6E\u6B21 accent \u6761\u3002 */
-.cc-traj-turn-head {
+/* \u7C98\u6027\u8F6E\u5934\uFF1A32px\uFF08h-8\uFF09\uFF1B\u8FDB\u884C\u4E2D\u5DE6\u7F18 2px accent \u6761 */
+.cc-trj-turnhead {
   position: sticky;
   top: 0;
   z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--ava-space-3, 12px);
+  gap: var(--ava-space-2, 8px);
   width: 100%;
-  height: 44px;
+  height: 32px;
   padding: 0 var(--ava-space-3, 12px);
   border: none;
-  background: var(--cc-traj-head-fill);
+  border-bottom: 0.5px solid var(--cc-l3);
+  background: color-mix(in srgb, var(--ava-bg-layer-1, #ffffff) 95%, transparent);
   color: var(--cc-t1);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.cc-traj-turn-head:hover {
+.cc-trj-turnhead:hover {
   background: var(--cc-hover);
 }
 
-.cc-traj-turn-head.run {
-  box-shadow: inset 2px 0 0 var(--cc-traj-accent);
+.cc-trj-turnhead.run {
+  box-shadow: inset 2px 0 0 var(--cc-trj-accent);
 }
 
-.cc-traj-turn-title {
+.cc-trj-chev {
+  display: inline-flex;
+  flex: none;
+  color: var(--cc-t3);
+}
+
+.cc-trj-turnname {
   flex: none;
   font-size: 13px;
   font-weight: 600;
   line-height: 18px;
-  font-variant-numeric: tabular-nums;
 }
 
-.cc-traj-turn-head.run .cc-traj-turn-title {
+.cc-trj-turnhead.run .cc-trj-turnname {
   color: color-mix(in srgb, var(--cc-blue) 55%, var(--cc-t3));
 }
 
-.cc-traj-turn-meta {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--cc-t3);
-  font-size: 12px;
-  line-height: 18px;
-  font-variant-numeric: tabular-nums;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* \u8F6E\u6B21\u6B63\u6587\uFF1A\u5361\u7247\u884C 10px \u95F4\u8DDD */
-.cc-traj-sec-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: var(--ava-space-2, 8px) var(--ava-space-3, 12px) var(--ava-space-4, 16px);
-}
-
-/* \u5361\u7247\u884C\uFF1A38px \u9AD8\u3001l4 \u8FB9\u6846\u3001layer-3 \u5E95\u3001radius-md */
-button.cc-traj-cell {
-  display: flex;
-  align-items: center;
-  gap: var(--ava-space-2, 8px);
-  width: 100%;
-  min-width: 0;
-  height: 38px;
-  padding: 0 var(--ava-space-2, 8px) 0 var(--ava-space-3, 12px);
-  border: 0.5px solid var(--cc-traj-line);
-  border-radius: var(--ava-radius-md, 12px);
-  background: var(--cc-traj-card);
-  color: var(--cc-t1);
-  font: inherit;
-  font-size: 12px;
-  line-height: 18px;
-  text-align: left;
-  cursor: pointer;
-}
-
-button.cc-traj-cell:hover {
-  border-color: var(--cc-l3);
-  background: color-mix(in srgb, var(--cc-t1) 5%, var(--ava-bg-layer-1, #ffffff));
-}
-
-/* \u7C7B\u522B\u8272\u6807\uFF1A22px \u9AD8\u3001radius-xs\u3001650 \u5B57\u91CD\u52A0\u5B57\u8DDD */
-.cc-traj-tag {
-  display: inline-flex;
+.cc-trj-reason {
   flex: none;
-  align-items: center;
-  height: 22px;
-  padding: 0 4px;
-  border-radius: var(--ava-radius-xs, 4px);
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.035em;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.cc-traj-tag.user {
-  color: var(--cc-success);
-  background: color-mix(in srgb, var(--cc-success) 12%, var(--ava-bg-layer-1, #ffffff));
-}
-
-.cc-traj-tag.message {
-  color: var(--cc-traj-msg-ink);
-  background: color-mix(in srgb, var(--cc-traj-msg-ink) 15%, var(--ava-bg-layer-1, #ffffff));
-}
-
-.cc-traj-tag.tool {
-  color: var(--cc-warn);
-  background: color-mix(in srgb, var(--cc-warn) 12%, var(--ava-bg-layer-1, #ffffff));
-}
-
-.cc-traj-tag.think {
+  padding: 1px 6px;
+  border-radius: var(--ava-radius-pill, 999px);
+  background: color-mix(in srgb, var(--cc-t1) 6%, var(--ava-bg-layer-1, #ffffff));
   color: var(--cc-t2);
-  background: color-mix(in srgb, var(--cc-t1) 5%, var(--ava-bg-layer-1, #ffffff));
-}
-
-.cc-traj-cell-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* \u5DE5\u5177\u884C\uFF1A\u7B49\u5BBD\u5B57\u4F53\u540D\u79F0 + \u4E09\u7EA7\u8272\u53C2\u6570\u9884\u89C8 */
-.cc-traj-cell-name {
-  flex: none;
-  max-width: 42%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--cc-mono);
+  font-size: 10px;
+  line-height: 14px;
   font-weight: 500;
 }
 
-/* \u9519\u8BEF\u6B65\u9AA4\u4EE5 danger \u8272\u5448\u73B0 */
-.cc-traj-cell-name.err {
-  color: var(--cc-danger);
+.cc-trj-live {
+  flex: none;
+  color: color-mix(in srgb, var(--cc-blue) 60%, var(--cc-t3));
+  font-size: 11px;
 }
 
-.cc-traj-cell-dim {
+.cc-trj-turnmeta {
+  margin-left: auto;
+  display: inline-flex;
+  gap: var(--ava-space-2, 8px);
+  color: var(--cc-t3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* \u8BB0\u5F55\u884C\uFF1A28px\uFF0Cgrid [52px \u6807\u7B7E | 1fr \u6458\u8981 | auto \u6307\u6807 | 14px \u7BAD\u5934]\uFF08\xA79.4\uFF09 */
+.cc-trj-rowwrap {
+  border-bottom: 0.5px solid var(--cc-l1);
+}
+
+.cc-trj-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto 14px;
+  align-items: center;
+  gap: var(--ava-space-2, 8px);
+  width: 100%;
+  height: 28px;
+  padding: 0 var(--ava-space-3, 12px);
+  border: none;
+  background: transparent;
+  color: var(--cc-t1);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.cc-trj-row:hover {
+  background: color-mix(in srgb, var(--cc-t1) 3%, var(--ava-bg-layer-1, #ffffff));
+}
+
+.cc-trj-row.on {
+  background: color-mix(in srgb, var(--cc-blue) 8%, var(--ava-bg-layer-1, #ffffff));
+}
+
+/* \u7C7B\u522B\u8272\u6807 chip\uFF1A10px \u7B49\u5BBD\u77ED\u7801\uFF08U/MSG/THINK/TOOL/SYS/CTX/ERR\uFF09\uFF0C\u6309 kind \u4E0A\u8272 */
+.cc-trj-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  padding: 1px 4px;
+  border-radius: var(--ava-radius-xs, 4px);
+  font-family: var(--cc-mono);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.cc-trj-tag.is-user {
+  color: var(--cc-t2);
+  background: color-mix(in srgb, var(--cc-t1) 6%, var(--ava-bg-layer-1, #ffffff));
+}
+
+.cc-trj-tag.is-message {
+  color: var(--cc-blue);
+  background: color-mix(in srgb, var(--cc-blue) 10%, var(--ava-bg-layer-1, #ffffff));
+}
+
+.cc-trj-tag.is-think {
+  color: color-mix(in srgb, var(--cc-blue) 60%, var(--ava-bg-layer-1, #ffffff));
+  background: color-mix(in srgb, var(--cc-blue) 8%, var(--ava-bg-layer-1, #ffffff));
+}
+
+.cc-trj-tag.is-tool {
+  color: color-mix(in srgb, var(--cc-blue) 30%, var(--cc-success) 70%);
+  background: color-mix(in srgb, var(--cc-blue) 12%, var(--cc-success) 12%, var(--ava-bg-layer-1, #ffffff));
+}
+
+.cc-trj-tag.is-context {
+  color: var(--cc-t3);
+  background: color-mix(in srgb, var(--cc-t1) 5%, var(--ava-bg-layer-1, #ffffff));
+}
+
+.cc-trj-tag.is-system {
+  color: var(--cc-t2);
+  background: color-mix(in srgb, var(--cc-t1) 6%, var(--ava-bg-layer-1, #ffffff));
+}
+
+.cc-trj-tag.is-error {
+  color: var(--cc-danger);
+  background: color-mix(in srgb, var(--cc-danger) 10%, var(--ava-bg-layer-1, #ffffff));
+}
+
+/* \u4E3B/\u6B21\u6458\u8981\uFF1A\u6709\u6B21\u7EA7\u6458\u8981\u65F6\u6807\u9898\u53D6 45% \u5BBD\u5E76\u8F6C\u7B49\u5BBD\uFF08ava_square \u540C\u6B3E\uFF09 */
+.cc-trj-row-main {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ava-space-2, 8px);
+  min-width: 0;
+}
+
+.cc-trj-row-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-trj-row-title.with-sum {
+  flex: none;
+  max-width: 45%;
+  font-family: var(--cc-mono);
+  font-size: 12px;
+}
+
+.cc-trj-row-sum {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--cc-t3);
+  font-size: 11px;
 }
 
-.cc-traj-dot {
-  width: 6px;
-  height: 6px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--cc-success);
+.cc-trj-row-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ava-space-2, 8px);
+  color: var(--cc-t3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.cc-traj-dot.running {
-  background: transparent;
-  border: 1.5px solid var(--cc-l3);
-  border-top-color: var(--cc-blue);
-  animation: cc-spin 0.75s linear infinite;
+.cc-trj-row-meta .is-ok {
+  color: var(--cc-success);
+  font-weight: 600;
 }
 
-.cc-traj-empty {
-  padding: var(--ava-space-3, 12px);
+.cc-trj-row-meta .is-fail {
+  color: var(--cc-danger);
+  font-weight: 600;
+}
+
+.cc-trj-row-caret {
+  display: inline-flex;
+  justify-content: center;
+  color: var(--cc-t3);
+}
+
+/* \u5C55\u5F00\u8BE6\u60C5\uFF1A\u7B49\u5BBD pre\uFF0C\u6700\u9AD8 256px \u5185\u6EDA\uFF08tool \u884C\u663E\u793A input/output \u539F\u6587\uFF09 */
+.cc-trj-detail {
+  padding: 0 var(--ava-space-3, 12px) var(--ava-space-2, 8px);
+}
+
+.cc-trj-detail pre {
+  max-height: 256px;
+  margin: 0;
+  padding: var(--ava-space-2, 8px);
+  overflow: auto;
+  border-radius: var(--ava-radius-xs, 4px);
+  background: color-mix(in srgb, var(--cc-t1) 3.5%, var(--ava-bg-layer-1, #ffffff));
+  color: var(--cc-t2);
+  font-family: var(--cc-mono);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.cc-trj-empty {
+  padding: var(--ava-space-5, 24px);
+  text-align: center;
   color: var(--cc-t3);
   font-size: 12px;
   line-height: 18px;
@@ -17944,116 +18292,513 @@ button.cc-traj-cell:hover {
 `;
 
 // src/trajectory.tsx
-import { jsx as jsx5, jsxs as jsxs4 } from "react/jsx-runtime";
-function turnMetrics(item) {
-  const usage = turnUsageOf(item);
-  const input2 = usage?.inputTokens ?? 0;
-  const output = usage?.outputTokens ?? 0;
-  if (input2 <= 0 && output <= 0) return item.streaming ? "\u8FDB\u884C\u4E2D" : "";
-  return `\u8F93\u5165 ${formatTokens(input2)} \xB7 \u8F93\u51FA ${formatTokens(output)}`;
+import { useEffect as useEffect4, useMemo, useRef as useRef3, useState as useState5 } from "react";
+
+// src/trajectory-model.ts
+var TAG_BY_KIND = {
+  user: "U",
+  message: "MSG",
+  thinking: "THINK",
+  tool: "TOOL",
+  system: "SYS",
+  context: "CTX",
+  error: "ERR"
+};
+var oneLine = (text7, max = 160) => firstLine(text7, max);
+function splitSummary(text7, shortMax, longMax = 160) {
+  const title = oneLine(text7, shortMax);
+  const summary = firstLine(text7, longMax);
+  return { title, summary: summary !== title ? summary : void 0 };
 }
-function Cell(props) {
-  const { tag, tagKind, text: text7, textKind, running, error, onClick } = props;
-  const textClass = textKind === "name" ? "cc-traj-cell-name" + (error ? " err" : "") : textKind === "dim" ? "cc-traj-cell-dim" : "cc-traj-cell-text";
-  return /* @__PURE__ */ jsxs4("button", { className: "cc-traj-cell", onClick, children: [
-    /* @__PURE__ */ jsx5("span", { className: `cc-traj-tag ${tagKind}`, children: tag }),
-    running && /* @__PURE__ */ jsx5("span", { className: "cc-traj-dot running" }),
-    /* @__PURE__ */ jsx5("span", { className: textClass, children: text7 })
+function toolDetail(inputText, resultText) {
+  return [
+    inputText.trim() ? `input:
+${inputText.trim()}` : "",
+    resultText?.trim() ? `output:
+${resultText.trim()}` : ""
+  ].filter(Boolean).join("\n\n");
+}
+function assignTurns(items) {
+  const turnOrdinal = /* @__PURE__ */ new Map();
+  let counter = 0;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].kind === "turn") turnOrdinal.set(i, ++counter);
+  }
+  const nextTurnOrdinal = (from) => {
+    for (const [idx, ord] of turnOrdinal) if (idx > from) return ord;
+    return 0;
+  };
+  const ordinals = new Array(items.length).fill(0);
+  let current = 0;
+  for (let i = 0; i < items.length; i++) {
+    const known = turnOrdinal.get(i);
+    if (known !== void 0) {
+      current = known;
+      ordinals[i] = known;
+      continue;
+    }
+    const item = items[i];
+    ordinals[i] = item.kind === "user" ? nextTurnOrdinal(i) || counter + 1 : current || nextTurnOrdinal(i);
+  }
+  return ordinals;
+}
+function cellsFromTurn(item, turn) {
+  const cells = [];
+  const usage = turnUsageOf(item);
+  const finalize = (cell) => {
+    const full = {
+      id: "",
+      index: 0,
+      ...cell,
+      searchText: [cell.tag, cell.title, cell.summary ?? "", cell.detail ?? ""].join("\n").toLowerCase()
+    };
+    return full;
+  };
+  let firstThinking = true;
+  const thinkingCell = (seg) => {
+    if (seg.trim() === "") return;
+    const { title, summary } = splitSummary(seg, 80);
+    cells.push(
+      finalize({
+        turn,
+        kind: "thinking",
+        tag: TAG_BY_KIND.thinking,
+        title,
+        summary,
+        detail: seg,
+        // 首段思考行携带该回合输出 token（表格行 token 展示口径不变）
+        tokens: usage && firstThinking ? usage.outputTokens : void 0
+      })
+    );
+    firstThinking = false;
+  };
+  for (let i = 0; i < item.steps.length; i++) {
+    thinkingCell(item.thinkingSegs[i] ?? "");
+    const step = item.steps[i];
+    cells.push(
+      finalize({
+        turn,
+        kind: "tool",
+        tag: TAG_BY_KIND.tool,
+        title: step.name,
+        summary: step.inputText.trim() ? firstLine(step.inputText, 100) : void 0,
+        detail: toolDetail(step.inputText, step.resultText),
+        ok: step.running ? void 0 : !step.isError,
+        running: step.running
+      })
+    );
+  }
+  thinkingCell(item.thinkingSegs[item.steps.length] ?? "");
+  if (item.answer.trim() !== "") {
+    const { title, summary } = splitSummary(item.answer, 80);
+    cells.push(
+      finalize({
+        turn,
+        kind: "message",
+        tag: TAG_BY_KIND.message,
+        title,
+        summary,
+        detail: item.answer,
+        tokens: usage?.outputTokens
+      })
+    );
+  }
+  if (item.retryText) {
+    cells.push(
+      finalize({
+        turn,
+        kind: "error",
+        tag: TAG_BY_KIND.error,
+        title: item.streaming ? "\u8BF7\u6C42\u91CD\u8BD5\u4E2D" : "\u8BF7\u6C42\u5931\u8D25\u91CD\u8BD5",
+        summary: firstLine(item.retryText, 100),
+        detail: item.retryText
+      })
+    );
+  }
+  return cells;
+}
+function attachmentNote(count) {
+  return `[\u56FE\u7247 \xD7${count}]`;
+}
+function buildTrajectory(items) {
+  const ordinals = assignTurns(items);
+  const cells = [];
+  const turnMap = /* @__PURE__ */ new Map();
+  const turns = [];
+  const ensureTurn = (turn) => {
+    let group = turnMap.get(turn);
+    if (!group) {
+      group = {
+        turn,
+        reason: "",
+        steps: 0,
+        streaming: false,
+        cells: [],
+        tools: 0,
+        input: 0,
+        output: 0,
+        failed: 0
+      };
+      turnMap.set(turn, group);
+      turns.push(group);
+    }
+    return group;
+  };
+  items.forEach((item, i) => {
+    const turn = ordinals[i];
+    const finalize = (cell) => ({
+      id: "",
+      index: 0,
+      ...cell,
+      searchText: [cell.tag, cell.title, cell.summary ?? "", cell.detail ?? ""].join("\n").toLowerCase()
+    });
+    switch (item.kind) {
+      case "user": {
+        const text7 = item.text.trim();
+        const note = item.attachments?.length ? attachmentNote(item.attachments.length) : "";
+        const { title, summary } = splitSummary(text7 || note, 80);
+        cells.push(
+          finalize({
+            turn,
+            kind: "user",
+            tag: TAG_BY_KIND.user,
+            title,
+            summary,
+            detail: text7 || note
+          })
+        );
+        break;
+      }
+      case "turn": {
+        const group = ensureTurn(turn);
+        if (item.streaming) group.streaming = true;
+        if (item.report?.reason) group.reason = item.report.reason;
+        const reported = item.report?.steps;
+        if (reported && reported > group.steps) group.steps = reported;
+        cells.push(...cellsFromTurn(item, turn));
+        break;
+      }
+      case "notice":
+        cells.push(
+          finalize({
+            turn,
+            kind: "system",
+            tag: TAG_BY_KIND.system,
+            title: oneLine(item.text, 80),
+            detail: item.text
+          })
+        );
+        break;
+      case "command": {
+        const outcome = item.outcome === null ? "\u6267\u884C\u4E2D" : item.outcome.kind === "success" ? "\u5B8C\u6210" : "\u5931\u8D25";
+        cells.push(
+          finalize({
+            turn,
+            kind: "context",
+            tag: TAG_BY_KIND.context,
+            title: `/${item.name}${item.args}`,
+            summary: `${outcome} \xB7 ${firstLine(item.outcome?.text ?? "", 60)}`,
+            detail: item.outcome?.text ?? ""
+          })
+        );
+        break;
+      }
+      case "compaction": {
+        const title = item.error ? "\u538B\u7F29\u5931\u8D25" : item.running ? "\u4E0A\u4E0B\u6587\u538B\u7F29\u4E2D" : `\u538B\u7F29 \xB7 ${item.shadowedItemCount ?? "?"} \u6761`;
+        cells.push(
+          finalize({
+            turn,
+            kind: "context",
+            tag: TAG_BY_KIND.context,
+            title,
+            summary: item.error ?? (item.summary ? firstLine(item.summary, 100) : void 0),
+            detail: item.summary ?? item.error ?? ""
+          })
+        );
+        break;
+      }
+    }
+  });
+  cells.forEach((cell, i) => {
+    cell.index = i + 1;
+    cell.id = `c${i + 1}`;
+  });
+  for (const cell of cells) {
+    const group = ensureTurn(cell.turn);
+    group.cells.push(cell);
+    if (cell.kind === "tool") group.tools += 1;
+    if (cell.ok === false) group.failed += 1;
+  }
+  const filled = turns.filter((group) => group.cells.length > 0);
+  const usageByTurn = /* @__PURE__ */ new Map();
+  let input2 = 0;
+  let output = 0;
+  let tools = 0;
+  let failed = 0;
+  ordinals.forEach((turn, i) => {
+    const item = items[i];
+    if (item.kind !== "turn") return;
+    const usage = turnUsageOf(item);
+    if (!usage) return;
+    const acc = usageByTurn.get(turn) ?? { input: 0, output: 0 };
+    acc.input += usage.inputTokens;
+    acc.output += usage.outputTokens;
+    usageByTurn.set(turn, acc);
+  });
+  for (const group of filled) {
+    const usage = usageByTurn.get(group.turn);
+    group.input = usage?.input ?? 0;
+    group.output = usage?.output ?? 0;
+    if (group.steps === 0) group.steps = group.tools;
+    input2 += group.input;
+    output += group.output;
+    tools += group.tools;
+    failed += group.failed;
+  }
+  return {
+    cells,
+    turns: filled,
+    stats: { turns: filled.filter((g) => g.turn > 0).length, cells: cells.length, tools, input: input2, output, failed }
+  };
+}
+
+// src/trajectory.tsx
+import { jsx as jsx5, jsxs as jsxs4 } from "react/jsx-runtime";
+var LANES = [
+  { key: "input", label: "\u8F93\u5165", kinds: ["user", "system", "context"] },
+  { key: "model", label: "\u6A21\u578B", kinds: ["message", "thinking", "error"] },
+  { key: "tool", label: "\u5DE5\u5177", kinds: ["tool"] }
+];
+var KIND_CLASS = {
+  user: "is-user",
+  message: "is-message",
+  thinking: "is-think",
+  tool: "is-tool",
+  system: "is-system",
+  context: "is-context",
+  error: "is-error"
+};
+function Chevron2({ open }) {
+  return /* @__PURE__ */ jsx5(
+    "svg",
+    {
+      width: "12",
+      height: "12",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      "aria-hidden": "true",
+      style: { transform: open ? "rotate(90deg)" : void 0, transition: "transform 150ms ease" },
+      children: /* @__PURE__ */ jsx5("path", { d: "M9 6l6 6-6 6" })
+    }
+  );
+}
+function Timeline({
+  cells,
+  stats,
+  selectedId,
+  onSelect
+}) {
+  if (cells.length === 0) return null;
+  const span = cells[cells.length - 1].index || cells.length;
+  const width = 100 / span;
+  return /* @__PURE__ */ jsxs4("div", { className: "cc-trj-timeline", children: [
+    /* @__PURE__ */ jsx5("p", { className: "cc-trj-statline", children: `${stats.turns} turns \xB7 ${stats.cells} records \xB7 ${stats.tools} tools \xB7 input \u2191${formatTokens(stats.input)} / output \u2193${formatTokens(stats.output)}` }),
+    /* @__PURE__ */ jsxs4("div", { className: "cc-trj-lanes", children: [
+      /* @__PURE__ */ jsx5("div", { className: "cc-trj-lane-labels", children: LANES.map((lane) => /* @__PURE__ */ jsx5("span", { className: "cc-trj-lane-label", children: lane.label }, lane.key)) }),
+      /* @__PURE__ */ jsx5("div", { className: "cc-trj-lane-tracks", children: LANES.map((lane) => /* @__PURE__ */ jsx5("div", { className: "cc-trj-lane-track", children: cells.map(
+        (cell) => lane.kinds.includes(cell.kind) ? /* @__PURE__ */ jsx5(
+          "button",
+          {
+            type: "button",
+            className: `cc-trj-block ${KIND_CLASS[cell.kind]}${selectedId === cell.id ? " on" : ""}`,
+            style: { left: `${(cell.index - 1) * width}%`, width: `max(3px, ${width}%)` },
+            title: `Turn ${cell.turn} \xB7 ${cell.tag} \xB7 ${cell.title}`,
+            onClick: () => onSelect(cell.id)
+          },
+          cell.id
+        ) : null
+      ) }, lane.key)) })
+    ] })
   ] });
 }
-function TrajectoryPanel({ items, onJump, onClose }) {
-  const turns = items.filter((item) => item.kind === "turn").length;
-  const total = items.reduce(
-    (sum, item) => item.kind === "turn" ? sum + (turnUsageOf(item)?.outputTokens ?? 0) + (turnUsageOf(item)?.inputTokens ?? 0) : sum,
-    0
-  );
-  let ordinal = 0;
-  const ordinals = items.map((item) => item.kind === "turn" ? ++ordinal : 0);
-  return /* @__PURE__ */ jsxs4("aside", { className: "cc-traj", "aria-label": "\u4F1A\u8BDD\u8F68\u8FF9", children: [
-    /* @__PURE__ */ jsxs4("div", { className: "cc-traj-head", children: [
-      /* @__PURE__ */ jsx5("span", { className: "cc-traj-title", children: "\u4F1A\u8BDD\u8F68\u8FF9" }),
-      /* @__PURE__ */ jsxs4("span", { className: "cc-traj-sum", children: [
-        turns,
-        " \u8F6E",
-        total > 0 ? ` \xB7 ${formatTokens(total)} tok` : ""
-      ] }),
-      /* @__PURE__ */ jsx5("button", { className: "cc-traj-x", onClick: onClose, title: "\u5173\u95ED\u8F68\u8FF9", "aria-label": "\u5173\u95ED\u8F68\u8FF9", children: "\u2715" })
-    ] }),
-    /* @__PURE__ */ jsxs4("div", { className: "cc-traj-list", children: [
-      items.length === 0 && /* @__PURE__ */ jsx5("div", { className: "cc-traj-empty", children: "\u6682\u65E0\u8F68\u8FF9" }),
-      items.map(
-        (item, i) => item.kind === "user" ? /* @__PURE__ */ jsx5("section", { className: "cc-traj-sec", children: /* @__PURE__ */ jsx5("div", { className: "cc-traj-sec-body", children: /* @__PURE__ */ jsx5(
-          Cell,
+function detailBody(cell) {
+  return cell.detail?.trim() || "\uFF08\u65E0\u8BE6\u60C5\uFF09";
+}
+function Row({
+  cell,
+  open,
+  selected,
+  onToggle,
+  registerRef
+}) {
+  const failed = cell.ok === false;
+  return /* @__PURE__ */ jsxs4("div", { className: "cc-trj-rowwrap", children: [
+    /* @__PURE__ */ jsxs4(
+      "button",
+      {
+        type: "button",
+        ref: registerRef,
+        className: `cc-trj-row${selected ? " on" : ""}`,
+        onClick: onToggle,
+        "aria-expanded": open,
+        children: [
+          /* @__PURE__ */ jsx5("span", { className: `cc-trj-tag ${KIND_CLASS[cell.kind]}`, children: cell.tag }),
+          /* @__PURE__ */ jsxs4("span", { className: "cc-trj-row-main", children: [
+            /* @__PURE__ */ jsx5("span", { className: "cc-trj-row-title" + (cell.summary ? " with-sum" : ""), children: cell.title }),
+            cell.summary && /* @__PURE__ */ jsx5("span", { className: "cc-trj-row-sum", children: cell.summary })
+          ] }),
+          /* @__PURE__ */ jsxs4("span", { className: "cc-trj-row-meta", children: [
+            cell.tokens != null && cell.tokens > 0 && /* @__PURE__ */ jsx5("span", { children: `${formatTokens(cell.tokens)} tok` }),
+            failed && /* @__PURE__ */ jsx5("span", { className: "is-fail", children: "\u5931\u8D25" }),
+            !failed && cell.ok === true && /* @__PURE__ */ jsx5("span", { className: "is-ok", children: "\u5B8C\u6210" })
+          ] }),
+          /* @__PURE__ */ jsx5("span", { className: "cc-trj-row-caret", children: /* @__PURE__ */ jsx5(Chevron2, { open }) })
+        ]
+      }
+    ),
+    open && /* @__PURE__ */ jsx5("div", { className: "cc-trj-detail", children: /* @__PURE__ */ jsx5("pre", { children: detailBody(cell) }) })
+  ] });
+}
+function TrajectoryView({ items }) {
+  const model = useMemo(() => buildTrajectory(items), [items]);
+  const [keyword, setKeyword] = useState5("");
+  const [collapsed, setCollapsed] = useState5(() => /* @__PURE__ */ new Set());
+  const [selectedId, setSelectedId] = useState5(null);
+  const rowRefs = useRef3(/* @__PURE__ */ new Map());
+  const kw = keyword.trim().toLowerCase();
+  const view = useMemo(() => {
+    if (!kw) return { cells: model.cells, turns: model.turns };
+    const matched = model.cells.filter((cell) => cell.searchText.includes(kw));
+    const ids = new Set(matched.map((cell) => cell.id));
+    return {
+      cells: matched,
+      turns: model.turns.map((turn) => ({ ...turn, cells: turn.cells.filter((cell) => ids.has(cell.id)) })).filter((turn) => turn.cells.length > 0)
+    };
+  }, [model, kw]);
+  const stats = useMemo(() => {
+    const totals = { turns: view.turns.length, cells: view.cells.length, tools: 0, input: 0, output: 0, failed: 0 };
+    for (const cell of view.cells) {
+      if (cell.kind === "tool") totals.tools += 1;
+      if (cell.ok === false) totals.failed += 1;
+    }
+    for (const turn of view.turns) {
+      totals.input += turn.input;
+      totals.output += turn.output;
+    }
+    return totals;
+  }, [view]);
+  const select = (cellId) => {
+    setSelectedId(cellId);
+    const cell = view.cells.find((item) => item.id === cellId);
+    if (!cell) return;
+    setCollapsed((prev) => {
+      if (!prev.has(cell.turn)) return prev;
+      const next = new Set(prev);
+      next.delete(cell.turn);
+      return next;
+    });
+  };
+  useEffect4(() => {
+    if (!selectedId) return;
+    rowRefs.current.get(selectedId)?.scrollIntoView({ block: "center" });
+  }, [selectedId, view.turns]);
+  const allCollapsed = view.turns.length > 0 && view.turns.every((turn) => collapsed.has(turn.turn));
+  const toggleAll = () => setCollapsed(allCollapsed ? /* @__PURE__ */ new Set() : new Set(view.turns.map((turn) => turn.turn)));
+  if (model.cells.length === 0) {
+    return /* @__PURE__ */ jsx5("div", { className: "cc-trj-root", children: /* @__PURE__ */ jsx5("div", { className: "cc-trj-empty", children: "\u8FD8\u6CA1\u6709\u53EF\u5C55\u793A\u7684\u8F68\u8FF9\u8BB0\u5F55" }) });
+  }
+  return /* @__PURE__ */ jsxs4("div", { className: "cc-trj-root", children: [
+    /* @__PURE__ */ jsxs4("div", { className: "cc-trj-toolbar", children: [
+      /* @__PURE__ */ jsxs4("span", { className: "cc-trj-searchbox", children: [
+        /* @__PURE__ */ jsxs4(
+          "svg",
           {
-            tag: "\u7528\u6237",
-            tagKind: "user",
-            text: firstLine(item.text, 36),
-            onClick: () => onJump(i)
+            width: "12",
+            height: "12",
+            viewBox: "0 0 24 24",
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: "2",
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            "aria-hidden": "true",
+            children: [
+              /* @__PURE__ */ jsx5("circle", { cx: "11", cy: "11", r: "7" }),
+              /* @__PURE__ */ jsx5("path", { d: "m20 20-3.5-3.5" })
+            ]
           }
-        ) }) }, i) : item.kind === "turn" ? /* @__PURE__ */ jsxs4("section", { className: "cc-traj-sec", children: [
-          /* @__PURE__ */ jsxs4(
-            "button",
-            {
-              className: "cc-traj-turn-head" + (item.streaming ? " run" : ""),
-              onClick: () => onJump(i),
-              children: [
-                /* @__PURE__ */ jsxs4("span", { className: "cc-traj-turn-title", children: [
-                  "\u7B2C ",
-                  ordinals[i],
-                  " \u8F6E"
-                ] }),
-                /* @__PURE__ */ jsx5("span", { className: "cc-traj-turn-meta", children: turnMetrics(item) })
-              ]
+        ),
+        /* @__PURE__ */ jsx5(
+          "input",
+          {
+            value: keyword,
+            onChange: (e) => setKeyword(e.target.value),
+            placeholder: "\u641C\u7D22\u8BB0\u5F55\u2026",
+            "aria-label": "\u641C\u7D22\u8F68\u8FF9\u8BB0\u5F55"
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsx5("span", { className: "cc-trj-count", children: `${view.cells.length} \u6761` }),
+      /* @__PURE__ */ jsx5("button", { type: "button", className: "cc-trj-toggleall", onClick: toggleAll, children: allCollapsed ? "\u5C55\u5F00\u5168\u90E8" : "\u6298\u53E0\u5168\u90E8" })
+    ] }),
+    /* @__PURE__ */ jsx5(Timeline, { cells: view.cells, stats, selectedId, onSelect: select }),
+    /* @__PURE__ */ jsx5("div", { className: "cc-trj-table", children: view.turns.length === 0 ? /* @__PURE__ */ jsx5("p", { className: "cc-trj-empty", children: "\u6CA1\u6709\u5339\u914D\u7684\u8BB0\u5F55" }) : view.turns.map((turn) => {
+      const isCollapsed = collapsed.has(turn.turn);
+      const tokens = turn.input + turn.output;
+      return /* @__PURE__ */ jsxs4("section", { className: "cc-trj-turn", children: [
+        /* @__PURE__ */ jsxs4(
+          "button",
+          {
+            type: "button",
+            className: "cc-trj-turnhead" + (turn.streaming ? " run" : ""),
+            onClick: () => setCollapsed((prev) => {
+              const next = new Set(prev);
+              if (next.has(turn.turn)) next.delete(turn.turn);
+              else next.add(turn.turn);
+              return next;
+            }),
+            "aria-expanded": !isCollapsed,
+            children: [
+              /* @__PURE__ */ jsx5("span", { className: "cc-trj-chev", children: /* @__PURE__ */ jsx5(Chevron2, { open: !isCollapsed }) }),
+              /* @__PURE__ */ jsx5("span", { className: "cc-trj-turnname", children: turn.turn === 0 ? "\u4F1A\u8BDD\u8BB0\u5F55" : `Turn ${turn.turn}` }),
+              turn.reason && /* @__PURE__ */ jsx5("span", { className: "cc-trj-reason", children: turn.reason }),
+              turn.streaming && /* @__PURE__ */ jsx5("span", { className: "cc-trj-live", children: "\u8FDB\u884C\u4E2D" }),
+              /* @__PURE__ */ jsx5("span", { className: "cc-trj-turnmeta", children: `${turn.steps} steps \xB7 ${turn.tools} tools${tokens > 0 ? ` \xB7 ${formatTokens(tokens)} tokens` : ""}` })
+            ]
+          }
+        ),
+        !isCollapsed && turn.cells.map((cell) => /* @__PURE__ */ jsx5(
+          Row,
+          {
+            cell,
+            open: selectedId === cell.id,
+            selected: selectedId === cell.id,
+            onToggle: () => selectedId === cell.id ? setSelectedId(null) : select(cell.id),
+            registerRef: (el) => {
+              if (el) rowRefs.current.set(cell.id, el);
+              else rowRefs.current.delete(cell.id);
             }
-          ),
-          /* @__PURE__ */ jsxs4("div", { className: "cc-traj-sec-body", children: [
-            item.thinking !== "" && /* @__PURE__ */ jsx5(
-              Cell,
-              {
-                tag: "\u601D\u8003",
-                tagKind: "think",
-                text: firstLine(item.thinking, 30),
-                textKind: "dim",
-                onClick: () => onJump(i)
-              }
-            ),
-            item.steps.map((step, j) => /* @__PURE__ */ jsx5(
-              Cell,
-              {
-                tag: "\u5DE5\u5177",
-                tagKind: "tool",
-                text: step.name,
-                textKind: "name",
-                running: step.running,
-                error: step.isError,
-                onClick: () => onJump(i)
-              },
-              step.id || j
-            )),
-            item.answer.trim() !== "" && /* @__PURE__ */ jsx5(
-              Cell,
-              {
-                tag: "\u6D88\u606F",
-                tagKind: "message",
-                text: firstLine(item.answer, 40),
-                onClick: () => onJump(i)
-              }
-            )
-          ] })
-        ] }, i) : null
-      )
-    ] })
+          },
+          cell.id
+        ))
+      ] }, turn.turn);
+    }) })
   ] });
 }
 
 // src/workspace-picker.tsx
-import { useEffect as useEffect4, useRef as useRef3, useState as useState5 } from "react";
-import { Fragment as Fragment4, jsx as jsx6, jsxs as jsxs5 } from "react/jsx-runtime";
-function WorkspacePicker({ agent, startDir, recent = [], onCancel, onPick }) {
-  const [listing, setListing] = useState5(null);
-  const [error, setError] = useState5(null);
-  const [loading, setLoading] = useState5(true);
-  const aliveRef = useRef3(true);
+import { useEffect as useEffect5, useRef as useRef4, useState as useState6 } from "react";
+import { Fragment as Fragment5, jsx as jsx6, jsxs as jsxs5 } from "react/jsx-runtime";
+function WorkspacePicker({ agent, startDir, recent = [], native, onCancel, onPick }) {
+  const [listing, setListing] = useState6(null);
+  const [error, setError] = useState6(null);
+  const [loading, setLoading] = useState6(true);
+  const [nativeBusy, setNativeBusy] = useState6(false);
+  const aliveRef = useRef4(true);
   const navigate = (path2) => {
     setLoading(true);
     agent.listDirs(path2).then((data) => {
@@ -18067,21 +18812,31 @@ function WorkspacePicker({ agent, startDir, recent = [], onCancel, onPick }) {
       if (aliveRef.current) setLoading(false);
     });
   };
-  useEffect4(() => {
+  useEffect5(() => {
     aliveRef.current = true;
     navigate(startDir);
     return () => {
       aliveRef.current = false;
     };
   }, [startDir]);
-  useEffect4(() => {
+  useEffect5(() => {
     const onKey = (e) => {
       if (e.key === "Escape") onCancel();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onCancel]);
-  return /* @__PURE__ */ jsxs5(Fragment4, { children: [
+  const browseNative = async () => {
+    if (!native || nativeBusy) return;
+    setNativeBusy(true);
+    try {
+      const dir = await native();
+      if (dir) onPick(dir);
+    } finally {
+      if (aliveRef.current) setNativeBusy(false);
+    }
+  };
+  return /* @__PURE__ */ jsxs5(Fragment5, { children: [
     /* @__PURE__ */ jsx6("div", { className: "cc-picker-mask", onClick: onCancel }),
     /* @__PURE__ */ jsxs5("div", { className: "cc-picker", role: "dialog", "aria-modal": "true", "aria-label": "\u9009\u62E9\u5DE5\u4F5C\u76EE\u5F55", children: [
       /* @__PURE__ */ jsxs5("header", { className: "cc-picker-head", children: [
@@ -18116,6 +18871,17 @@ function WorkspacePicker({ agent, startDir, recent = [], onCancel, onPick }) {
       listing && listing.roots.length > 0 && /* @__PURE__ */ jsx6("div", { className: "cc-picker-roots", children: listing.roots.map((root4) => /* @__PURE__ */ jsx6("button", { className: "cc-picker-root", onClick: () => navigate(root4), children: root4 }, root4)) }),
       error && /* @__PURE__ */ jsx6("div", { className: "cc-picker-err", children: error }),
       /* @__PURE__ */ jsxs5("footer", { className: "cc-picker-foot", children: [
+        native && /* @__PURE__ */ jsx6(
+          "button",
+          {
+            className: "cc-picker-native",
+            disabled: nativeBusy,
+            title: "\u4F7F\u7528\u64CD\u4F5C\u7CFB\u7EDF\u6587\u4EF6\u5939\u9009\u62E9\u5668",
+            onClick: () => void browseNative(),
+            children: nativeBusy ? "\u6253\u5F00\u7CFB\u7EDF\u5BF9\u8BDD\u6846\u2026" : "\u6D4F\u89C8\u7CFB\u7EDF\u76EE\u5F55\u2026"
+          }
+        ),
+        /* @__PURE__ */ jsx6("span", { className: "cc-picker-foot-gap" }),
         /* @__PURE__ */ jsx6("button", { className: "cc-picker-cancel", onClick: onCancel, children: "\u53D6\u6D88" }),
         /* @__PURE__ */ jsx6(
           "button",
@@ -18381,8 +19147,8 @@ function GoalBar({
   onAction,
   onEdit
 }) {
-  const [editing, setEditing] = useState6(false);
-  const [draft, setDraft] = useState6("");
+  const [editing, setEditing] = useState7(false);
+  const [draft, setDraft] = useState7("");
   const phase = goal.phase === "active" ? goal.armed ? "\u8FDB\u884C\u4E2D\u7684\u76EE\u6807" : "\u5F85\u7EE7\u7EED\u7684\u76EE\u6807" : goal.phase === "paused" ? "\u5DF2\u6682\u505C\u7684\u76EE\u6807" : goal.phase === "blocked" ? "\u53D7\u963B\u7684\u76EE\u6807" : "\u8FDB\u884C\u4E2D\u7684\u76EE\u6807";
   const blocked = goal.phase === "blocked" ? goal.blockedReason?.message : void 0;
   const resumable = goal.phase !== "active" || !goal.armed;
@@ -18469,7 +19235,7 @@ function todoProgress(todos) {
   ].filter(Boolean).join("\u2002\xB7\u2002");
 }
 function TodoPanel({ todos }) {
-  const [collapsed, setCollapsed] = useState6(true);
+  const [collapsed, setCollapsed] = useState7(true);
   if (todos.length === 0) return null;
   return /* @__PURE__ */ jsx7("div", { className: "cc-todopanel", children: /* @__PURE__ */ jsxs6("div", { className: "cc-todopanel-body", children: [
     /* @__PURE__ */ jsxs6("button", { className: "cc-todopanel-head", onClick: () => setCollapsed((v) => !v), "aria-expanded": !collapsed, children: [
@@ -18571,34 +19337,34 @@ function ContextMeter({ tokens, limit }) {
     }
   );
 }
-function ChatView({ agent, storage }) {
-  const [items, setItems] = useState6([]);
-  const [pending, setPending] = useState6([]);
-  const [input2, setInput] = useState6("");
-  const [attachments, setAttachments] = useState6([]);
-  const [busy, setBusy] = useState6(false);
-  const [error, setError] = useState6(null);
+function ChatView({ agent, storage, pickNative }) {
+  const [items, setItems] = useState7([]);
+  const [pending, setPending] = useState7([]);
+  const [input2, setInput] = useState7("");
+  const [attachments, setAttachments] = useState7([]);
+  const [busy, setBusy] = useState7(false);
+  const [error, setError] = useState7(null);
   const { currentId: sessionId, recents: workspaces, command } = useChatStore();
-  const [info, setInfo] = useState6(null);
-  const [catalog, setCatalog] = useState6([]);
-  const [wsPicker, setWsPicker] = useState6(false);
-  const [lastTurn, setLastTurn] = useState6(null);
-  const [traj, setTraj] = useState6(false);
-  const [mode, setMode] = useState6("standard");
-  const [draftCwd, setDraftCwd] = useState6(void 0);
-  const [draftModel, setDraftModel] = useState6("");
-  const [goal, setGoal] = useState6(null);
-  const [plan, setPlan] = useState6(null);
-  const [todos, setTodos] = useState6([]);
-  const [slashIndex, setSlashIndex] = useState6(0);
-  const [slashDismissed, setSlashDismissed] = useState6(false);
-  const busyRef = useRef4(false);
-  const sessionRef = useRef4(null);
-  const subRef = useRef4(null);
-  const scrollRef = useRef4(null);
-  const inputRef = useRef4(null);
-  const fileRef = useRef4(null);
-  const slashListRef = useRef4(null);
+  const [info, setInfo] = useState7(null);
+  const [catalog, setCatalog] = useState7([]);
+  const [wsPicker, setWsPicker] = useState7(false);
+  const [lastTurn, setLastTurn] = useState7(null);
+  const [view, setView] = useState7("chat");
+  const [mode, setMode] = useState7("standard");
+  const [draftCwd, setDraftCwd] = useState7(void 0);
+  const [draftModel, setDraftModel] = useState7("");
+  const [goal, setGoal] = useState7(null);
+  const [plan, setPlan] = useState7(null);
+  const [todos, setTodos] = useState7([]);
+  const [slashIndex, setSlashIndex] = useState7(0);
+  const [slashDismissed, setSlashDismissed] = useState7(false);
+  const busyRef = useRef5(false);
+  const sessionRef = useRef5(null);
+  const subRef = useRef5(null);
+  const scrollRef = useRef5(null);
+  const inputRef = useRef5(null);
+  const fileRef = useRef5(null);
+  const slashListRef = useRef5(null);
   const addFiles = async (files) => {
     const next = [];
     const errs = [];
@@ -18617,11 +19383,11 @@ function ChatView({ agent, storage }) {
     }
     if (errs.length > 0) setError(errs.join("\uFF1B"));
   };
-  useEffect5(() => {
+  useEffect6(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [items, pending]);
-  useEffect5(() => {
+  useEffect6(() => {
     if (!lastTurn) return;
     setItems((prev) => {
       const last = prev[prev.length - 1];
@@ -18723,7 +19489,7 @@ function ChatView({ agent, storage }) {
     } catch {
     }
   };
-  const homeDirRef = useRef4(null);
+  const homeDirRef = useRef5(null);
   const defaultWorkspace = async () => {
     if (homeDirRef.current) return homeDirRef.current;
     try {
@@ -18750,7 +19516,7 @@ function ChatView({ agent, storage }) {
     }
     return created.id;
   };
-  useEffect5(() => {
+  useEffect6(() => {
     let alive = true;
     (async () => {
       try {
@@ -18767,7 +19533,7 @@ function ChatView({ agent, storage }) {
       subRef.current?.dispose();
     };
   }, [agent]);
-  useEffect5(() => {
+  useEffect6(() => {
     let alive = true;
     agent.listModels().then((data) => {
       if (!alive) return;
@@ -18854,8 +19620,8 @@ function ChatView({ agent, storage }) {
       await storage.set("recentWorkspaces", next).catch(() => void 0);
     }
   };
-  const lastCommandSeq = useRef4(0);
-  useEffect5(() => {
+  const lastCommandSeq = useRef5(0);
+  useEffect6(() => {
     if (!command || command.seq === lastCommandSeq.current) return;
     lastCommandSeq.current = command.seq;
     if (command.kind === "select") attach(command.id);
@@ -19054,13 +19820,13 @@ function ChatView({ agent, storage }) {
   const slashQuery = (slashMatch?.[1] ?? "").toLowerCase();
   const slashFiltered = slashMenuOpen ? SLASH_COMMANDS.filter((c) => ("/" + c.name).startsWith("/" + slashQuery)) : [];
   const slashActive = Math.min(slashIndex, Math.max(slashFiltered.length - 1, 0));
-  const [slashOverflowBelow, setSlashOverflowBelow] = useState6(false);
-  useEffect5(() => {
+  const [slashOverflowBelow, setSlashOverflowBelow] = useState7(false);
+  useEffect6(() => {
     if (!slashMenuOpen || slashDismissed) return;
     const viewport = slashListRef.current;
     setSlashOverflowBelow(viewport !== null && viewport.scrollTop + viewport.clientHeight < viewport.scrollHeight - 1);
   });
-  useEffect5(() => {
+  useEffect6(() => {
     if (!slashMenuOpen || slashDismissed || slashFiltered.length === 0) return;
     document.getElementById(`cc-slash-option-${slashActive}`)?.scrollIntoView({ block: "nearest" });
   }, [slashMenuOpen, slashDismissed, slashActive, slashFiltered.length]);
@@ -19099,21 +19865,31 @@ function ChatView({ agent, storage }) {
     }
   };
   const canSend = !busy && (input2.trim() !== "" || attachments.length > 0);
-  const jumpToItem = (index3) => {
-    document.getElementById(itemAnchor(index3))?.scrollIntoView({ block: "start", behavior: "smooth" });
-  };
-  useEffect5(() => {
-    if (!traj) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") setTraj(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [traj]);
   return /* @__PURE__ */ jsxs6("div", { className: "cc-root", children: [
     /* @__PURE__ */ jsx7("style", { children: chatappCss }),
     /* @__PURE__ */ jsxs6("header", { className: "cc-head", children: [
-      /* @__PURE__ */ jsx7("span", { className: "cc-head-title", children: "\u5BF9\u8BDD" }),
+      /* @__PURE__ */ jsxs6("div", { className: "cc-viewtabs", role: "tablist", "aria-label": "\u4E2D\u680F\u89C6\u56FE", children: [
+        /* @__PURE__ */ jsx7(
+          "button",
+          {
+            className: "cc-viewtab" + (view === "chat" ? " on" : ""),
+            role: "tab",
+            "aria-selected": view === "chat",
+            onClick: () => setView("chat"),
+            children: "\u5BF9\u8BDD"
+          }
+        ),
+        /* @__PURE__ */ jsx7(
+          "button",
+          {
+            className: "cc-viewtab" + (view === "trajectory" ? " on" : ""),
+            role: "tab",
+            "aria-selected": view === "trajectory",
+            onClick: () => setView("trajectory"),
+            children: "\u8F68\u8FF9"
+          }
+        )
+      ] }),
       /* @__PURE__ */ jsxs6("div", { className: "cc-head-right", children: [
         busy && /* @__PURE__ */ jsx7("span", { className: "cc-head-dim", children: "\u751F\u6210\u4E2D\u2026" }),
         /* @__PURE__ */ jsx7(
@@ -19122,68 +19898,55 @@ function ChatView({ agent, storage }) {
             tokens: info?.contextTokens ?? 0,
             limit: info?.contextWindowTokens ?? 0
           }
-        ),
-        /* @__PURE__ */ jsx7(
-          "button",
-          {
-            className: "cc-head-btn" + (traj ? " on" : ""),
-            "aria-expanded": traj,
-            onClick: () => setTraj((v) => !v),
-            title: "\u4F1A\u8BDD\u8F68\u8FF9",
-            children: "\u8F68\u8FF9"
-          }
         )
       ] })
     ] }),
-    /* @__PURE__ */ jsxs6("div", { className: "cc-main", children: [
-      /* @__PURE__ */ jsx7("div", { className: "cc-scroll", ref: scrollRef, children: items.length === 0 && pending.length === 0 ? /* @__PURE__ */ jsxs6("div", { className: "cc-empty", children: [
-        /* @__PURE__ */ jsx7("span", { className: "cc-empty-ico", children: /* @__PURE__ */ jsx7(
-          "svg",
+    /* @__PURE__ */ jsx7("div", { className: "cc-main", children: view === "trajectory" ? /* @__PURE__ */ jsx7(TrajectoryView, { items }) : /* @__PURE__ */ jsx7("div", { className: "cc-scroll", ref: scrollRef, children: items.length === 0 && pending.length === 0 ? /* @__PURE__ */ jsxs6("div", { className: "cc-empty", children: [
+      /* @__PURE__ */ jsx7("span", { className: "cc-empty-ico", children: /* @__PURE__ */ jsx7(
+        "svg",
+        {
+          width: "20",
+          height: "20",
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: "1.8",
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          children: /* @__PURE__ */ jsx7("path", { d: "M7.9 20A9 9 0 1 0 4 16.1L2 22Z" })
+        }
+      ) }),
+      /* @__PURE__ */ jsx7("span", { className: "cc-empty-title", children: "\u5F00\u59CB\u65B0\u7684\u5BF9\u8BDD" }),
+      /* @__PURE__ */ jsx7("span", { children: "\u5728\u4E0B\u65B9\u8F93\u5165\u6D88\u606F\uFF0CAgent \u4F1A\u5373\u65F6\u54CD\u5E94\u3002" })
+    ] }) : /* @__PURE__ */ jsxs6("div", { className: "cc-flow", children: [
+      /* @__PURE__ */ jsx7(ChatItems, { items, sessionId: sessionId ?? void 0 }),
+      pending.map(
+        (card) => card.kind === "approval" ? /* @__PURE__ */ jsx7(
+          ApprovalCardView,
           {
-            width: "20",
-            height: "20",
-            viewBox: "0 0 24 24",
-            fill: "none",
-            stroke: "currentColor",
-            strokeWidth: "1.8",
-            strokeLinecap: "round",
-            strokeLinejoin: "round",
-            children: /* @__PURE__ */ jsx7("path", { d: "M7.9 20A9 9 0 1 0 4 16.1L2 22Z" })
-          }
-        ) }),
-        /* @__PURE__ */ jsx7("span", { className: "cc-empty-title", children: "\u5F00\u59CB\u65B0\u7684\u5BF9\u8BDD" }),
-        /* @__PURE__ */ jsx7("span", { children: "\u5728\u4E0B\u65B9\u8F93\u5165\u6D88\u606F\uFF0CAgent \u4F1A\u5373\u65F6\u54CD\u5E94\u3002" })
-      ] }) : /* @__PURE__ */ jsxs6("div", { className: "cc-flow", children: [
-        /* @__PURE__ */ jsx7(ChatItems, { items, sessionId: sessionId ?? void 0 }),
-        pending.map(
-          (card) => card.kind === "approval" ? /* @__PURE__ */ jsx7(
-            ApprovalCardView,
-            {
-              card,
-              onDecision: (id, d) => void onDecision(id, d)
-            },
-            card.requestId
-          ) : card.kind === "plan_review" ? /* @__PURE__ */ jsx7(
-            PlanReviewCardView,
-            {
-              card,
-              onVerdict: (id, v) => void onVerdict(id, v)
-            },
-            card.requestId
-          ) : /* @__PURE__ */ jsx7(
-            QuestionCardView,
-            {
-              card,
-              onSubmit: (id, a) => void onSubmitAnswers(id, a)
-            },
-            card.requestId
-          )
+            card,
+            onDecision: (id, d) => void onDecision(id, d)
+          },
+          card.requestId
+        ) : card.kind === "plan_review" ? /* @__PURE__ */ jsx7(
+          PlanReviewCardView,
+          {
+            card,
+            onVerdict: (id, v) => void onVerdict(id, v)
+          },
+          card.requestId
+        ) : /* @__PURE__ */ jsx7(
+          QuestionCardView,
+          {
+            card,
+            onSubmit: (id, a) => void onSubmitAnswers(id, a)
+          },
+          card.requestId
         )
-      ] }) }),
-      traj && /* @__PURE__ */ jsx7(TrajectoryPanel, { items, onJump: jumpToItem, onClose: () => setTraj(false) })
-    ] }),
+      )
+    ] }) }) }),
     error && /* @__PURE__ */ jsx7("div", { className: "cc-error", children: error }),
-    /* @__PURE__ */ jsxs6("div", { className: "cc-composer-wrap", children: [
+    view === "chat" && /* @__PURE__ */ jsxs6("div", { className: "cc-composer-wrap", children: [
       /* @__PURE__ */ jsx7(TodoPanel, { todos }),
       goal && goal.phase !== "complete" && /* @__PURE__ */ jsx7(GoalBar, { goal, onAction: (action) => void onGoalAction(action), onEdit: (o) => void onGoalEdit(o) }),
       /* @__PURE__ */ jsxs6("div", { className: "cc-composer", children: [
@@ -19201,7 +19964,7 @@ function ChatView({ agent, storage }) {
             },
             children: slashFiltered.map((c, i) => {
               const prev = slashFiltered[i - 1];
-              return /* @__PURE__ */ jsxs6(Fragment5, { children: [
+              return /* @__PURE__ */ jsxs6(Fragment6, { children: [
                 !prev || prev.section !== c.section ? /* @__PURE__ */ jsx7("div", { className: "cc-slash-section", children: SECTION_LABELS[c.section] }) : null,
                 /* @__PURE__ */ jsxs6(
                   "button",
@@ -19363,6 +20126,7 @@ function ChatView({ agent, storage }) {
         agent,
         startDir: info?.workingDir || info?.root || draftCwd,
         recent: workspaces,
+        native: pickNative,
         onCancel: () => setWsPicker(false),
         onPick: (dir) => {
           setWsPicker(false);
@@ -19374,7 +20138,7 @@ function ChatView({ agent, storage }) {
 }
 
 // src/session-sidebar.tsx
-import { useEffect as useEffect6, useLayoutEffect as useLayoutEffect2, useRef as useRef5, useState as useState7 } from "react";
+import { useEffect as useEffect7, useLayoutEffect as useLayoutEffect2, useRef as useRef6, useState as useState8 } from "react";
 import { jsx as jsx8, jsxs as jsxs7 } from "react/jsx-runtime";
 var SESSION_LIMIT = 5;
 function Popconfirm({
@@ -19382,9 +20146,9 @@ function Popconfirm({
   onConfirm,
   onClose
 }) {
-  const ref = useRef5(null);
-  const [pos, setPos] = useState7(null);
-  useEffect6(() => {
+  const ref = useRef6(null);
+  const [pos, setPos] = useState8(null);
+  useEffect7(() => {
     const onDoc = (e) => {
       if (ref.current && !ref.current.contains(e.target)) onClose();
     };
@@ -19460,7 +20224,7 @@ function SessionRow({
   onExport,
   onRemove
 }) {
-  const [confirmOpen, setConfirmOpen] = useState7(false);
+  const [confirmOpen, setConfirmOpen] = useState8(false);
   return /* @__PURE__ */ jsxs7("div", { className: "cc-sb-item", children: [
     /* @__PURE__ */ jsxs7(
       "button",
@@ -19513,15 +20277,15 @@ function SessionSidebar({ agent }) {
   const { sessions, currentId } = useChatStore();
   const groups = groupSessions(sessions);
   const currentKey = sessions.find((s) => s.id === currentId)?.workingDir;
-  const lastKeyRef = useRef5(currentKey);
+  const lastKeyRef = useRef6(currentKey);
   if (currentKey !== void 0) lastKeyRef.current = currentKey;
   const anchorKey = currentKey ?? lastKeyRef.current;
-  const [expanded, setExpanded] = useState7(/* @__PURE__ */ new Set());
-  const [collapsed, setCollapsed] = useState7(/* @__PURE__ */ new Set());
-  const [revealed, setRevealed] = useState7(/* @__PURE__ */ new Set());
-  const [busyId, setBusyId] = useState7(null);
-  const [busyWs, setBusyWs] = useState7(null);
-  const [error, setError] = useState7(null);
+  const [expanded, setExpanded] = useState8(/* @__PURE__ */ new Set());
+  const [collapsed, setCollapsed] = useState8(/* @__PURE__ */ new Set());
+  const [revealed, setRevealed] = useState8(/* @__PURE__ */ new Set());
+  const [busyId, setBusyId] = useState8(null);
+  const [busyWs, setBusyWs] = useState8(null);
+  const [error, setError] = useState8(null);
   const toggle = (key, isCurrent) => {
     if (isCurrent) {
       setCollapsed((prev) => {
@@ -19546,7 +20310,7 @@ function SessionSidebar({ agent }) {
       setError(`\u4F1A\u8BDD\u5217\u8868\u5237\u65B0\u5931\u8D25\uFF1A${e instanceof Error ? e.message : String(e)}`);
     }
   };
-  const [pendingWs, setPendingWs] = useState7(null);
+  const [pendingWs, setPendingWs] = useState8(null);
   const remove = async (session) => {
     setBusyId(session.id);
     setError(null);
@@ -19732,7 +20496,9 @@ function setup(ctx) {
     ctx.slots.inject("surface.main", {
       viewId: "chatapp",
       title: "\u5BF9\u8BDD",
-      component: async () => ({ default: () => /* @__PURE__ */ jsx10(ChatView, { agent: ctx.agent, storage: ctx.storage }) })
+      component: async () => ({
+        default: () => /* @__PURE__ */ jsx10(ChatView, { agent: ctx.agent, storage: ctx.storage, pickNative: ctx.desktop?.pickFolder })
+      })
     })
   ];
   return {

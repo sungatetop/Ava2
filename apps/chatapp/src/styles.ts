@@ -387,6 +387,34 @@ export const chatappCss = `
   padding-top: var(--ava-space-4, 16px);
 }
 
+/* 「浏览系统目录…」：左对齐的次级入口（唤起 OS 原生文件夹选择器） */
+.cc-picker-native {
+  height: 30px;
+  padding: 0 var(--ava-space-4, 16px);
+  border: 0.5px solid var(--cc-l2);
+  border-radius: var(--ava-radius-pill, 999px);
+  background: transparent;
+  color: var(--cc-t2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cc-picker-native:hover:not(:disabled) {
+  background: var(--cc-hover);
+  color: var(--cc-t1);
+}
+
+.cc-picker-native:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* 占位：把取消/使用此目录推到右侧，浏览系统目录留在左侧 */
+.cc-picker-foot-gap {
+  flex: 1;
+}
+
 .cc-picker-ok {
   height: 30px;
   padding: 0 var(--ava-space-4, 16px);
