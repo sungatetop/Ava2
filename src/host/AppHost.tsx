@@ -4,7 +4,7 @@ import { Component, Suspense, lazy, useEffect, useRef, useState, useSyncExternal
 import { registry } from "./registry";
 import { AppIconView, ICON_LG, ICON_SM } from "./app-icon";
 import { getLazy, lazyId, setLazy, clearLazyCache } from "./lazy-cache";
-import { installFromDir, setEnabled as setEnabledApi, uninstall as uninstallApi } from "./apps";
+import { installFromDir, installFromHub, listHub, setEnabled as setEnabledApi, uninstall as uninstallApi, type HubApp } from "./apps";
 import { loadInstalled } from "./loader";
 import type { AppRecord, UserMenuAction, UserMenuItemSpec } from "./types";
 
@@ -335,10 +335,40 @@ export function AppList({
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string>();
+  /** 视图：我的应用（已安装） / 应用中心（远程仓库 App Hub） */
+  const [tab, setTab] = useState<"installed" | "hub">("installed");
+  /** 应用中心：远程可安装列表（按需拉取）+ 来源仓库 + 加载/错误态 */
+  const [hubApps, setHubApps] = useState<HubApp[]>([]);
+  const [hubSource, setHubSource] = useState("");
+  const [hubLoading, setHubLoading] = useState(false);
+  const [hubErr, setHubErr] = useState<string>();
   /** 卸载确认（AlertDialog）：删除 App 目录不可逆，对话框确认而非一键直删 */
   const [confirmUninstall, setConfirmUninstall] = useState<AppRecord | null>(null);
   const apps = registry.listApps();
   const selected = apps.find((a) => a.manifest.id === selectedId);
+
+  /** 拉取应用中心列表（关键字由服务端过滤） */
+  const refreshHub = async (keyword = "") => {
+    setHubErr(undefined);
+    setHubLoading(true);
+    try {
+      const data = await listHub(keyword);
+      setHubApps(data.apps);
+      setHubSource(data.source);
+    } catch (e) {
+      setHubErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setHubLoading(false);
+    }
+  };
+
+  // 应用中心：进入或关键字变化时拉取（300ms 防抖）
+  useEffect(() => {
+    if (tab !== "hub") return;
+    const timer = setTimeout(() => void refreshHub(query), 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, query]);
 
   const setEnabled = async (a: AppRecord, enabled: boolean) => {
     setActionErr(undefined);
@@ -385,6 +415,21 @@ export function AppList({
     }
   };
 
+  /** 从应用中心下载安装：成功后增量装配并刷新远程列表（已安装标记） */
+  const installHubApp = async (app: HubApp) => {
+    setActionErr(undefined);
+    setBusy(true);
+    try {
+      const installed = await installFromHub(app.manifest.id);
+      await loadInstalled(installed);
+      await refreshHub(query);
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   /** 打开 App 主视图（抽屉收起） */
   const openApp = (a: AppRecord) => {
     const viewId = registry.appPrimaryView(a.manifest.id);
@@ -401,16 +446,46 @@ export function AppList({
   return (
     <section className="app-store">
       <div className="store-head">
-        <h1>我的应用</h1>
+        <h1>{tab === "installed" ? "我的应用" : "应用中心"}</h1>
+        <div className="store-tabs">
+          <button
+            className={"store-tab" + (tab === "installed" ? " on" : "")}
+            onClick={() => setTab("installed")}
+          >
+            已安装
+          </button>
+          <button
+            className={"store-tab" + (tab === "hub" ? " on" : "")}
+            onClick={() => setTab("hub")}
+          >
+            应用中心
+          </button>
+        </div>
         <div className="store-search">
           <AppIconView icon="M21 21l-4.3-4.3M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0z" size={ICON_SM} />
-          <input placeholder="搜索应用…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input
+            placeholder={tab === "installed" ? "搜索应用…" : "搜索应用中心…"}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
         </div>
-        <button className="store-install-btn" onClick={() => setInstallOpen((v) => !v)} disabled={busy} title="安装 App（产物目录）">
-          {installOpen ? "收起" : "安装"}
-        </button>
+        {tab === "installed" && (
+          <button className="store-install-btn" onClick={() => setInstallOpen((v) => !v)} disabled={busy} title="安装 App（产物目录）">
+            {installOpen ? "收起" : "安装"}
+          </button>
+        )}
+        {tab === "hub" && (
+          <button
+            className="store-install-btn"
+            onClick={() => void refreshHub(query)}
+            disabled={hubLoading}
+            title="刷新应用中心列表"
+          >
+            {hubLoading ? "刷新中…" : "刷新"}
+          </button>
+        )}
       </div>
-      {installOpen && (
+      {installOpen && tab === "installed" && (
         <div className="store-install">
           <input
             placeholder="App 产物目录（绝对路径）"
@@ -424,7 +499,45 @@ export function AppList({
         </div>
       )}
       {actionErr && <div className="fail">操作失败：{actionErr}</div>}
-      {shown.length === 0 ? (
+
+      {tab === "hub" ? (
+        <>
+          <div className="store-source">
+            {hubSource && <>来源仓库：{hubSource}（apps/ 目录，仅可安装预构建产物）</>}
+          </div>
+          {hubErr && <div className="fail">加载应用中心失败：{hubErr}</div>}
+          {hubLoading && hubApps.length === 0 && <div className="empty">正在获取应用中心列表…</div>}
+          {!hubLoading && !hubErr && hubApps.length === 0 && (
+            <div className="empty">应用中心暂无可用 App</div>
+          )}
+          {hubApps.length > 0 && (
+            <div className="hub-grid">
+              {hubApps.map((h) => (
+                <div key={h.manifest.id} className="hub-card">
+                  <span className="tile-icon">
+                    <AppIconView icon={h.manifest.icon} size={ICON_LG} />
+                  </span>
+                  <div className="hub-meta">
+                    <div className="hub-name">
+                      {h.manifest.name}
+                      <span className="hub-ver">v{h.manifest.version}</span>
+                    </div>
+                    {h.manifest.description && <div className="hub-desc">{h.manifest.description}</div>}
+                    {h.manifest.author && <div className="hub-sub">开发者：{h.manifest.author}</div>}
+                  </div>
+                  <button
+                    className={"btn-solid hub-btn" + (h.installed ? " installed" : "")}
+                    disabled={busy || h.installed}
+                    onClick={() => void installHubApp(h)}
+                  >
+                    {h.installed ? "已安装" : busy ? "安装中…" : "安装"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : shown.length === 0 ? (
         <div className="empty">尚未安装任何 App（安装源需含 manifest.json 与预构建产物）</div>
       ) : (
         <div className="app-tile-grid">

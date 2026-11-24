@@ -3,8 +3,8 @@
 //! 链路：启动静默检查 → 有新版本经事件 `ava2://update-available` 通知前端 → 用户确认后
 //! 下载校验（minisign 签名由插件校验）→ 停边车 → 安装 → 重启。
 //!
-//! 更新清单由 `scripts/publish.ps1` 生成并上传 OSS：
-//! `ava2/channels/<channel>/windows-x86_64/update.json`；
+//! 更新清单由 `scripts/publish.ps1` 生成并发布到 GitHub Release：
+//! `https://github.com/sungatetop/Ava2/releases/latest/download/latest.json`；
 //! 签名私钥 `scripts/keys/ava2-updater.key`（不入库），公钥已编入客户端 `tauri.conf.json`。
 
 use std::sync::Arc;
@@ -30,7 +30,7 @@ pub struct UpdateInfo {
 
 /// 启动后台检查：有新版本时向所有窗口发事件。
 ///
-/// 失败静默（离线 / OSS 不可达时不打扰用户），仅写 stderr 便于排查。
+/// 失败静默（离线 / Release 不可达时不打扰用户），仅写 stderr 便于排查。
 pub fn spawn_check(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let Ok(updater) = app.updater() else {

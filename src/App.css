@@ -973,6 +973,113 @@ button:disabled {
   opacity: 0.6;
 }
 
+/* ── 应用中心（App Hub：远程仓库 apps/ 目录） ── */
+.store-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--ava-radius-pill);
+  background: var(--ava-bg-layer-2);
+}
+
+.store-tab {
+  height: 28px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--ava-radius-pill);
+  background: transparent;
+  color: var(--ava-label-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.store-tab.on {
+  background: var(--ava-bg-layer-1);
+  color: var(--ava-label-primary);
+  box-shadow: var(--ava-shadow-elevated);
+}
+
+.store-source {
+  margin-bottom: var(--ava-space-3);
+  color: var(--ava-label-tertiary);
+  font-size: 12px;
+}
+
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--ava-space-3);
+}
+
+.hub-card {
+  display: flex;
+  align-items: center;
+  gap: var(--ava-space-3);
+  padding: var(--ava-space-3);
+  border: 0.5px solid var(--ava-border-l2);
+  border-radius: var(--ava-radius-lg);
+  background: var(--ava-bg-layer-1);
+}
+
+.hub-card .tile-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--ava-radius-lg);
+  background: var(--ava-interactive-bg-hover);
+  color: var(--ava-label-secondary);
+}
+
+.hub-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.hub-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ava-space-2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ava-label-primary);
+}
+
+.hub-ver {
+  color: var(--ava-label-tertiary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.hub-desc {
+  margin-top: 2px;
+  color: var(--ava-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.hub-sub {
+  margin-top: 2px;
+  color: var(--ava-label-tertiary);
+  font-size: 12px;
+}
+
+.hub-btn {
+  flex: none;
+}
+
+.hub-btn.installed {
+  background: transparent;
+  border: 0.5px solid var(--ava-border-l2);
+  color: var(--ava-label-tertiary);
+}
+
 /* ── 详情弹窗（居中 modal） ── */
 .modal-backdrop {
   position: fixed;

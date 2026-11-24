@@ -43,7 +43,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM0MUM0OEM3QUI2QkFBNkMKUldSc3FtdXJ4MGdjeEVTTWx2Ujg2VHJmbUp1RFdzVWFUOU9acXQzZzhpQlRVaCtSNnFzMHVpMzgK",
       "endpoints": [
-        "https://scalingagentlab.oss-cn-beijing.aliyuncs.com/ava2/channels/stable/windows-x86_64/update.json"
+        "https://github.com/sungatetop/Ava2/releases/latest/download/latest.json"
       ]
     }
   }

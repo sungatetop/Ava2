@@ -6,22 +6,25 @@
 #   .\scripts\publish.ps1 -Bump patch        # 先自增版本（或 minor / major），再构建发布
 #   .\scripts\publish.ps1 -Version 0.3.0     # 先同步到指定版本，再构建发布
 #   .\scripts\publish.ps1 -SkipBuild         # 复用已有 bundle，仅收集 + 上传
-#   .\scripts\publish.ps1 -SkipUpload        # 只本地打包，不传 OSS
-#   .\scripts\publish.ps1 -DryRun            # 打印上传命令，不实际执行
+#   .\scripts\publish.ps1 -SkipUpload        # 只本地打包，不发布到 GitHub Release
+#   .\scripts\publish.ps1 -DryRun            # 打印发布命令，不实际执行
 #   .\scripts\publish.ps1 -Bundles msi       # 打包目标（默认 nsis,msi；自动更新依赖 nsis）
 #
-# Local output:  release/v<version>/  (安装包 / .sig / update.json / manifest.json / sha256.txt)
+# Local output:  release/v<version>/  (安装包 / .sig / latest.json / manifest.json / sha256.txt)
 #
-# OSS layout (bucket: scalingagentlab, 与 ava 的 releases/ 前缀隔离，避免同版本号互相覆盖):
-#   ava2/releases/<channel>/windows-x86_64/<version>/<installer+*.sig / manifest.json / sha256.txt>
-#   ava2/channels/<channel>/windows-x86_64/update.json      <- 客户端 updater 检查点
+# GitHub Release layout (repo: sungatetop/Ava2)：
+#   release v<version> 资产：安装包 / *.sig / latest.json / manifest.json / sha256.txt
+#   客户端 updater 检查点：https://github.com/sungatetop/Ava2/releases/latest/download/latest.json
+#   stable 频道发正式 release（--latest），beta/dev 发 prerelease。
 #
 # Notes:
 #   - 版本源是 package.json；scripts/version.mjs 同步 tauri.conf.json / Cargo.toml / Cargo.lock。
 #   - 边车（onion-server + onion-sandbox）必须在 tauri build 前构建：bundle.resources 会打包它们。
 #   - 自动更新：Windows 上用 NSIS `*-setup.exe` 作为更新包（Tauri v2 直接给原始产物签名，
 #     产出 `.exe.sig` / `.msi.sig`，无 zip 包裹）；msi 仅手动分发。
-#   - 签名私钥 scripts/keys/ava2-updater.key（不入库），密码当前阶段硬编码于此。
+#   - 签名私钥 scripts/keys/ava2-updater.key（不入库），密码从 scripts/publish.local.ps1
+#     或 AVA2_SIGNING_PASSWORD 环境变量读取。
+#   - 上传依赖 GitHub CLI（gh），需先 `gh auth login`。
 
 param(
     [ValidateSet("stable", "beta", "dev")]
@@ -45,17 +48,13 @@ $BundleDir    = Join-Path $TauriDir "target\release\bundle"
 if ([string]::IsNullOrWhiteSpace($OutDir)) { $OutDir = Join-Path $Root "release" }
 
 $Platform        = "windows-x86_64"
-$OssBucket       = "scalingagentlab"
-$OssEndpoint     = "oss-cn-beijing.aliyuncs.com"
-$OssPrefix       = "ava2"
+$ReleaseRepo     = "sungatetop/Ava2"
 $SigningKey      = Join-Path $Root "scripts\keys\ava2-updater.key"
 
-# 本地凭据（不入库）：scripts/publish.local.ps1 定义 $OssAccessKeyId /
-# $OssAccessKeySecret / $SigningPassword；缺失时回退同名环境变量。
+# 本地凭据（不入库）：scripts/publish.local.ps1 定义 $SigningPassword；
+# 缺失时回退 AVA2_SIGNING_PASSWORD 环境变量。上传走 gh 的登录态。
 $LocalSecrets = Join-Path $PSScriptRoot "publish.local.ps1"
 if (Test-Path $LocalSecrets) { . $LocalSecrets }
-if (-not $OssAccessKeyId)     { $OssAccessKeyId     = $env:AVA2_OSS_ACCESS_KEY_ID }
-if (-not $OssAccessKeySecret) { $OssAccessKeySecret = $env:AVA2_OSS_ACCESS_KEY_SECRET }
 if (-not $SigningPassword)    { $SigningPassword    = $env:AVA2_SIGNING_PASSWORD }
 
 function Write-Step([string]$msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
@@ -65,27 +64,6 @@ function Write-Utf8File([string]$Path, [string]$Content) {
     [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
 }
 function Get-Sha256([string]$Path) { (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
-
-function Find-OssUtil {
-    foreach ($candidate in @(
-        (Join-Path $Root "ossutil64.exe"),
-        (Join-Path $Root "scripts\ossutil.exe"),
-        (Join-Path $Root "scripts\ossutil64.exe")
-    )) {
-        if (Test-Path $candidate) { return $candidate }
-    }
-    return $null
-}
-
-function Invoke-OssUpload([string]$OssUtil, [string]$LocalPath, [string]$RemotePath) {
-    if ($DryRun) {
-        Write-Host "[DryRun] ossutil cp $LocalPath -> $RemotePath" -ForegroundColor DarkYellow
-        return
-    }
-    & $OssUtil cp $LocalPath $RemotePath --force -i $OssAccessKeyId -k $OssAccessKeySecret -e $OssEndpoint
-    if ($LASTEXITCODE -ne 0) { Write-Fail "OSS upload failed: $RemotePath" }
-    Write-Host "  uploaded $RemotePath"
-}
 
 # 覆盖运行中的 exe 会因文件占用失败；Windows 允许重命名使用中的可执行文件，
 # 故先改名腾出目标路径（旧文件留在同级，下次构建前清理）。
@@ -192,7 +170,7 @@ if (-not $SkipBuild) {
     if (-not (Test-Path $SigningKey)) {
         Write-Fail "updater signing key not found: $SigningKey (tauri signer generate -w scripts/keys/ava2-updater.key)"
     }
-    # 签名环境：tauri build 阶段对 NSIS/MSI 产物直接产出 .sig（供 update.json 使用）
+    # 签名环境：tauri build 阶段对 NSIS/MSI 产物直接产出 .sig（供 latest.json 使用）
     $env:TAURI_SIGNING_PRIVATE_KEY = $SigningKey
     $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $SigningPassword
     # 构建期数据与生产 ~/.onion 隔离
@@ -247,9 +225,10 @@ if ($artifacts.Count -eq 0) {
     Write-Fail "no installer found under $BundleDir (expected nsis/*-setup.exe or msi/*.msi for v$ver)"
 }
 
-# ---- 7. Release metadata (update.json / manifest.json / sha256.txt) ----
-Write-Step "7/8 write update.json / manifest.json / sha256.txt"
-$baseUrl = "https://$OssBucket.$OssEndpoint/$OssPrefix/releases/$Channel/$Platform/$ver"
+# ---- 7. Release metadata (latest.json / manifest.json / sha256.txt) ----
+Write-Step "7/8 write latest.json / manifest.json / sha256.txt"
+$tag = "v$ver"
+$baseUrl = "https://github.com/$ReleaseRepo/releases/download/$tag"
 $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
 $nsis = $artifacts | Where-Object { $_.kind -eq "nsis" } | Select-Object -First 1
@@ -268,11 +247,11 @@ if ($updaterArtifact) {
         url       = "$baseUrl/$($updaterArtifact.file)"
     }
 } else {
-    Write-Host "  WARNING: 无已签名安装器（nsis/msi），update.json 无 platforms 条目，客户端无法自动更新" -ForegroundColor Yellow
+    Write-Host "  WARNING: 无已签名安装器（nsis/msi），latest.json 无 platforms 条目，客户端无法自动更新" -ForegroundColor Yellow
 }
 
 # Tauri v2 updater 清单格式
-$updateJson = [ordered]@{
+$latestJson = [ordered]@{
     version   = $ver
     notes     = $notesText
     pub_date  = $pubDate
@@ -292,10 +271,10 @@ $manifestJson = [ordered]@{
     artifacts  = $artifacts
 }
 
-$updatePath   = Join-Path $verDir "update.json"
+$latestPath   = Join-Path $verDir "latest.json"
 $manifestPath = Join-Path $verDir "manifest.json"
 $shaPath      = Join-Path $verDir "sha256.txt"
-Write-Utf8File -Path $updatePath -Content ($updateJson | ConvertTo-Json -Depth 6)
+Write-Utf8File -Path $latestPath -Content ($latestJson | ConvertTo-Json -Depth 6)
 Write-Utf8File -Path $manifestPath -Content ($manifestJson | ConvertTo-Json -Depth 6)
 $shaLines = @()
 foreach ($a in $artifacts) {
@@ -304,24 +283,44 @@ foreach ($a in $artifacts) {
 }
 Write-Utf8File -Path $shaPath -Content (($shaLines -join "`n") + "`n")
 
-# ---- 8. Upload to OSS ----
+# ---- 8. Publish to GitHub Release ----
+$isPrerelease = $Channel -ne "stable"
 if ($SkipUpload) {
-    Write-Step "8/8 skip OSS upload (-SkipUpload)"
+    Write-Step "8/8 skip GitHub Release (-SkipUpload)"
 } else {
-    Write-Step "8/8 upload to OSS (oss://$OssBucket/$OssPrefix)"
-    $ossUtil = Find-OssUtil
-    if (-not $ossUtil) { Write-Fail "ossutil.exe not found (expected ava2/scripts/ossutil.exe)" }
-
-    $versionPath = "oss://$OssBucket/$OssPrefix/releases/$Channel/$Platform/$ver"
-    foreach ($file in (Get-ChildItem -Path $verDir -File | Where-Object { $_.Name -ne "update.json" })) {
-        Invoke-OssUpload -OssUtil $ossUtil -LocalPath $file.FullName -RemotePath "$versionPath/$($file.Name)"
+    Write-Step "8/8 publish GitHub Release ($ReleaseRepo $tag)"
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Write-Fail "GitHub CLI (gh) not found; install it and run: gh auth login" }
+    $assets = @(Get-ChildItem -Path $verDir -File | ForEach-Object { $_.FullName })
+    # 探测 release 是否已存在（gh 对不存在的 tag 返回非零并写 stderr）
+    $previousEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & gh release view $tag --repo $ReleaseRepo 2>&1 | Out-Null
+    $releaseExists = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = $previousEap
+    if (-not $releaseExists) {
+        $createArgs = @("release", "create", $tag, "--repo", $ReleaseRepo,
+                        "--title", "ava2 $tag", "--notes", $notesText)
+        if ($isPrerelease) { $createArgs += "--prerelease" } else { $createArgs += "--latest" }
+        if ($DryRun) {
+            Write-Host "[DryRun] gh $($createArgs -join ' ') < $($assets.Count) assets" -ForegroundColor DarkYellow
+        } else {
+            & gh @createArgs @assets
+            if ($LASTEXITCODE -ne 0) { Write-Fail "gh release create failed" }
+            Write-Host "  created release $tag with $($assets.Count) assets"
+        }
+    } elseif ($DryRun) {
+        Write-Host "[DryRun] gh release upload $tag < $($assets.Count) assets --clobber" -ForegroundColor DarkYellow
+    } else {
+        & gh release upload $tag @assets --repo $ReleaseRepo --clobber
+        if ($LASTEXITCODE -ne 0) { Write-Fail "gh release upload failed" }
+        Write-Host "  uploaded $($assets.Count) assets to $tag"
     }
-    Invoke-OssUpload -OssUtil $ossUtil -LocalPath $updatePath -RemotePath "oss://$OssBucket/$OssPrefix/channels/$Channel/$Platform/update.json"
 }
 
 Write-Host "`n==> done: ava2 v$ver ($Channel)" -ForegroundColor Green
 Write-Host "artifacts : $verDir"
 Write-Host "manifest  : $manifestPath"
 Write-Host "checksums : $shaPath"
-Write-Host "update    : https://$OssBucket.$OssEndpoint/$OssPrefix/channels/$Channel/$Platform/update.json"
+Write-Host "release   : https://github.com/$ReleaseRepo/releases/tag/$tag"
+if (-not $isPrerelease) { Write-Host "updater   : https://github.com/$ReleaseRepo/releases/latest/download/latest.json" }
 if ($nsisSigUrl) { Write-Host "nsis sig  : $nsisSigUrl" }

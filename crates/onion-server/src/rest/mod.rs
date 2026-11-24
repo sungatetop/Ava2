@@ -7,6 +7,7 @@
 
 pub(crate) mod error;
 
+pub(crate) mod app_hub;
 pub(crate) mod apps;
 pub(crate) mod attachments;
 mod capabilities;
@@ -44,11 +45,11 @@ pub(crate) fn build_rest_router() -> axum::Router<RouterState> {
         .route("/v1/peers", get(capabilities::peers))
         .route("/v1/config", get(capabilities::config))
         // 模型管理：目录读面 + 供应商/模型写面 + 默认模型 + 连接测试
-        .route("/v1/models", get(capabilities::models).post(models::add_model))
         .route(
-            "/v1/models/default",
-            put(models::set_default),
+            "/v1/models",
+            get(capabilities::models).post(models::add_model),
         )
+        .route("/v1/models/default", put(models::set_default))
         .route("/v1/models/test", post(models::test_model))
         .route(
             "/v1/models/{provider}/{model}",
@@ -60,7 +61,10 @@ pub(crate) fn build_rest_router() -> axum::Router<RouterState> {
             axum::routing::delete(models::remove_provider),
         )
         // 定时任务管理（全局任务面）：列表/创建/编辑·启停/删除/立即执行
-        .route("/v1/tasks", get(schedules::list_tasks).post(schedules::create_task))
+        .route(
+            "/v1/tasks",
+            get(schedules::list_tasks).post(schedules::create_task),
+        )
         .route(
             "/v1/tasks/{id}",
             axum::routing::patch(schedules::update_task).delete(schedules::delete_task),
@@ -143,8 +147,14 @@ pub(crate) fn build_rest_router() -> axum::Router<RouterState> {
         // /v1/net/fetch 直连上游）
         .route("/v1/skill-hub/install", post(skill_hub::install))
         .route("/v1/mcp/servers", get(capabilities::mcp_servers))
-        .route("/v1/mcp/servers/{name}/probe", post(capabilities::mcp_probe))
-        .route("/v1/mcp/servers/{name}/resync", post(capabilities::mcp_resync))
+        .route(
+            "/v1/mcp/servers/{name}/probe",
+            post(capabilities::mcp_probe),
+        )
+        .route(
+            "/v1/mcp/servers/{name}/resync",
+            post(capabilities::mcp_resync),
+        )
         .route("/v1/mcp/reconcile", post(capabilities::mcp_reconcile))
         .route("/v1/schedules", get(capabilities::schedules))
         .route("/v1/memory", get(capabilities::memory_list))
@@ -155,11 +165,12 @@ pub(crate) fn build_rest_router() -> axum::Router<RouterState> {
         .route("/v1/fs/dirs", get(fsdirs::dirs))
         // AppHost App 仓库：安装 / 卸载 / 启停 / 静态产物
         .route("/v1/apps", get(apps::list))
+        // App Hub（远程仓库 apps/ 目录）：可安装列表 + 下载安装
+        // 注意：必须排在 `/v1/apps/{id}` 之前，axum 静态段优先但显式排序更稳妥。
+        .route("/v1/apps/hub", get(app_hub::list))
+        .route("/v1/apps/hub/install", post(app_hub::install))
         .route("/v1/apps/install", post(apps::install))
-        .route(
-            "/v1/apps/{id}",
-            get(apps::manifest).delete(apps::uninstall),
-        )
+        .route("/v1/apps/{id}", get(apps::manifest).delete(apps::uninstall))
         .route("/v1/apps/{id}/enabled", put(apps::set_enabled))
         .route("/v1/apps/{id}/{*path}", get(apps::asset))
 }

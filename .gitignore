@@ -4,17 +4,12 @@
 # 发布签名私钥（严禁入库）
 scripts/keys/
 
-# 本地发布凭据（OSS AccessKey / 签名密码，严禁入库）
+# 本地发布凭据（签名密码，严禁入库）
 scripts/publish.local.ps1
 
 # 本地模型默认值（内网 base_url / api_key，严禁入库）
 local-defaults.json
 .onion-test/
-
-# ossutil 二进制（从 ava 项目复制或官方下载，不入库）
-scripts/ossutil.exe
-scripts/ossutil64.exe
-ossutil64.exe
 
 # 边车构建产物（由 dev.ps1 / publish.ps1 构建后拷贝，不入库）
 src-tauri/resources/onion-server.exe
@@ -36,6 +31,9 @@ node_modules
 dist
 dist-ssr
 *.local
+# App 产物目录需入库（App Hub 从仓库 apps/ 目录安装预构建产物）
+!apps/*/dist/
+!apps/*/dist/**
 
 # vendor ESM 构建产物（npm run vendor 从 vendor-src 再生，不入库）
 src/vendor/

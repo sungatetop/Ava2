@@ -4,7 +4,7 @@
   "version": "0.2.0",
   "description": "定时任务管理：创建/启停/立即执行/删除；独立会话或绑定会话投递。",
   "author": "Ava Team",
-  "homepage": "https://github.com/ava-labs/ava2",
+  "homepage": "https://github.com/sungatetop/Ava2",
   "license": "MIT",
   "icon": "M12 6v6l4.5 3 M21.5 12a9.5 9.5 0 1 1-19 0 9.5 9.5 0 0 1 19 0z",
   "hostApi": 2,

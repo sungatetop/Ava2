@@ -353,6 +353,52 @@ pub(crate) async fn manifest(
     Ok(Json(manifest))
 }
 
+/// 安装核心（阻塞）：校验安装源目录 → 受控复制到 `<apps_dir>/<id>/` → 登记。
+/// 本地目录安装与 App Hub 远程安装（先下载到临时目录）共用同一实现。
+pub(crate) fn install_from_source(
+    source: &Path,
+    apps_dir: &Path,
+    overwrite: bool,
+) -> Result<AppEntry, ApiError> {
+    let source = source
+        .canonicalize()
+        .map_err(|e| ApiError::bad_request("app_path_invalid", format!("安装源不可用: {e}")))?;
+    if !source.is_dir() {
+        return Err(ApiError::bad_request(
+            "app_path_invalid",
+            "安装源必须是包含 manifest.json 的目录",
+        ));
+    }
+    let manifest = read_manifest(&source)?;
+    let id = validate_manifest(&manifest, &source)?;
+    let target = apps_dir.join(&id);
+    if target.exists() {
+        if !overwrite {
+            return Err(ApiError::conflict(
+                "app_exists",
+                format!("App「{id}」已安装；覆盖安装需 overwrite=true"),
+            ));
+        }
+        fs::remove_dir_all(&target)
+            .map_err(|e| ApiError::internal(format!("移除旧版本失败: {e}")))?;
+    }
+    copy_tree(&source, &target)
+        .map_err(|e| ApiError::bad_request("app_copy_failed", format!("复制产物失败: {e}")))?;
+    let mut state = read_state(apps_dir);
+    let installed_at_ms = now_ms();
+    state.apps.insert(
+        id,
+        StateEntry { enabled: true, installed_at_ms },
+    );
+    write_state(apps_dir, &state)?;
+    Ok(AppEntry { manifest, enabled: true, installed_at_ms })
+}
+
+/// 登记表里的已安装 id 集合（App Hub 列表据此标记「已安装」）。
+pub(crate) fn installed_ids(apps_dir: &Path) -> Vec<String> {
+    read_state(apps_dir).apps.into_keys().collect()
+}
+
 /// `POST /v1/apps/install`：把本地目录安装为 App（受控复制 + 校验 + 登记）。
 pub(crate) async fn install(
     State(state): State<RouterState>,
@@ -364,39 +410,8 @@ pub(crate) async fn install(
     let apps_dir = (*state.apps_dir).clone();
     let source = PathBuf::from(body.path.trim());
     let overwrite = body.overwrite;
-    let installed = tokio::task::spawn_blocking(move || -> Result<AppEntry, ApiError> {
-        let source = source
-            .canonicalize()
-            .map_err(|e| ApiError::bad_request("app_path_invalid", format!("安装源不可用: {e}")))?;
-        if !source.is_dir() {
-            return Err(ApiError::bad_request(
-                "app_path_invalid",
-                "安装源必须是包含 manifest.json 的目录",
-            ));
-        }
-        let manifest = read_manifest(&source)?;
-        let id = validate_manifest(&manifest, &source)?;
-        let target = apps_dir.join(&id);
-        if target.exists() {
-            if !overwrite {
-                return Err(ApiError::conflict(
-                    "app_exists",
-                    format!("App「{id}」已安装；覆盖安装需 overwrite=true"),
-                ));
-            }
-            fs::remove_dir_all(&target)
-                .map_err(|e| ApiError::internal(format!("移除旧版本失败: {e}")))?;
-        }
-        copy_tree(&source, &target)
-            .map_err(|e| ApiError::bad_request("app_copy_failed", format!("复制产物失败: {e}")))?;
-        let mut state = read_state(&apps_dir);
-        let installed_at_ms = now_ms();
-        state.apps.insert(
-            id,
-            StateEntry { enabled: true, installed_at_ms },
-        );
-        write_state(&apps_dir, &state)?;
-        Ok(AppEntry { manifest, enabled: true, installed_at_ms })
+    let installed = tokio::task::spawn_blocking(move || {
+        install_from_source(&source, &apps_dir, overwrite)
     })
     .await
     .map_err(|e| ApiError::internal(e.to_string()))??;

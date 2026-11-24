@@ -4,7 +4,7 @@
   "version": "0.2.5",
   "description": "技能启停管理 + 技能广场：本地技能按来源分组启停（禁用名单落盘 .onion/skills-manager.json，下一轮对话生效）；接入腾讯 SkillHub 支持搜索、查看详情、一键安装到项目 .onion/skills。",
   "author": "Ava Team",
-  "homepage": "https://github.com/ava-labs/ava2",
+  "homepage": "https://github.com/sungatetop/Ava2",
   "license": "MIT",
   "icon": "M4 5h7 M4 10h9 M4 15h6 M17 4v6 M17 14v6 M14 7h6 M14 17h6",
   "hostApi": 2,

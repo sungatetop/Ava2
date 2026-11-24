@@ -70,3 +70,40 @@ export async function setEnabled(appId: string, enabled: boolean): Promise<void>
     }),
   );
 }
+
+/** App Hub 中的一条可安装 App（远程仓库 apps/ 目录） */
+export interface HubApp {
+  manifest: AppManifest;
+  /** 登记表口径：本机已安装 */
+  installed: boolean;
+}
+
+/** App Hub 列表结果 */
+export interface HubList {
+  /** 仓库坐标（`owner/repo@branch`） */
+  source: string;
+  apps: HubApp[];
+}
+
+/** 远程可安装 App 列表（关键字可选，服务端按 name/id/description 过滤） */
+export async function listHub(query = ""): Promise<HubList> {
+  const suffix = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : "";
+  const res = await unwrap(
+    await fetch(`${getAgentBase()}/v1/apps/hub${suffix}`, { cache: "no-store" }),
+  );
+  const data = (await res.json()) as { source?: string; apps?: HubApp[] };
+  return { source: data.source ?? "", apps: data.apps ?? [] };
+}
+
+/** 从 App Hub 下载并安装（边车按仓库文件树逐文件下载 → 校验 → 复制 → 登记） */
+export async function installFromHub(id: string, overwrite = false): Promise<InstalledApp> {
+  const res = await unwrap(
+    await fetch(`${getAgentBase()}/v1/apps/hub/install`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, overwrite }),
+    }),
+  );
+  const data = (await res.json()) as { manifest: AppManifest; enabled: boolean; installed_at_ms: number };
+  return { manifest: data.manifest, enabled: data.enabled, installedAtMs: data.installed_at_ms };
+}

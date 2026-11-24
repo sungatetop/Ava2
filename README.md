@@ -85,6 +85,32 @@ cargo build --release  # 边车与内核
 npm run bundle         # 桌面安装包（scripts/publish.ps1，需本地签名密钥）
 ```
 
+## 预置 App
+
+安装包内置 6 个 App，边车首次启动时种子安装进 `<ONION_HOME>/apps`（仅首次，之后以用户
+的启停/卸载选择为准）：
+
+| id | 名称 | slot |
+| --- | --- | --- |
+| `chatapp` | 对话 | surface.main / nav.sidebar / panel.sidebar |
+| `file-explorer` | 文件浏览 | panel.canvas |
+| `file-viewer` | 文件预览 | surface.canvas |
+| `model-manager` | 模型管理 | surface.main / nav.sidebar |
+| `skills-manager` | 技能管理 | surface.main / nav.sidebar |
+| `task-manager` | 定时任务 | surface.main / nav.sidebar |
+
+`apps/` 下其余 App（`hotboard`、`repoatlas`、`storyloom`、`app-devkit` 等）为源码样例，不随
+安装包分发，可按开发指南自行安装。
+
+## 发布与自动更新
+
+- 仓库：<https://github.com/sungatetop/Ava2>
+- `scripts/publish.ps1` 构建并把安装包、`.sig`、`latest.json` 等资产发布到 GitHub Release
+  （`stable` 发正式版，`beta` / `dev` 发 prerelease；上传依赖 `gh auth login`）。
+- 客户端默认检查 `https://github.com/sungatetop/Ava2/releases/latest/download/latest.json`
+  （见 [tauri.conf.json](src-tauri/tauri.conf.json) 的 `plugins.updater.endpoints`，
+  minisign 公钥亦在其中）。
+
 ## 测试
 
 ```powershell
