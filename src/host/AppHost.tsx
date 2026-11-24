@@ -342,6 +342,8 @@ export function AppList({
   const [hubSource, setHubSource] = useState("");
   const [hubLoading, setHubLoading] = useState(false);
   const [hubErr, setHubErr] = useState<string>();
+  /** 应用中心：正在安装的 App id（仅该卡片显示「安装中」，避免全部按钮进入安装态） */
+  const [installingId, setInstallingId] = useState<string>();
   /** 卸载确认（AlertDialog）：删除 App 目录不可逆，对话框确认而非一键直删 */
   const [confirmUninstall, setConfirmUninstall] = useState<AppRecord | null>(null);
   const apps = registry.listApps();
@@ -419,6 +421,7 @@ export function AppList({
   const installHubApp = async (app: HubApp) => {
     setActionErr(undefined);
     setBusy(true);
+    setInstallingId(app.manifest.id);
     try {
       const installed = await installFromHub(app.manifest.id);
       await loadInstalled(installed);
@@ -427,6 +430,7 @@ export function AppList({
       setActionErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+      setInstallingId(undefined);
     }
   };
 
@@ -530,7 +534,11 @@ export function AppList({
                     disabled={busy || h.installed}
                     onClick={() => void installHubApp(h)}
                   >
-                    {h.installed ? "已安装" : busy ? "安装中…" : "安装"}
+                    {h.installed
+                      ? "已安装"
+                      : installingId === h.manifest.id
+                        ? "安装中…"
+                        : "安装"}
                   </button>
                 </div>
               ))}
